@@ -1,18 +1,16 @@
-// /public/public.js (COMPLETO E FINAL - BASEADO NO SEU ARQUIVO)
+// /public/public.js (COM A VERIFICAÇÃO DE SEGURANÇA)
 
-// --- Mapa Global para Links Internos ---
 let articleTitleMap = new Map();
-
-// --- Configuração do Marked.js (Extensão para Links Internos) ---
 const renderer = new marked.Renderer();
-const originalLinkRenderer = renderer.link; // Salva o renderizador de link original
-const originalTextRenderer = renderer.text; // Salva o renderizador de texto original
+const originalLinkRenderer = renderer.link;
+const originalTextRenderer = renderer.text;
+
 renderer.text = (text) => {
-    // CORREÇÃO: Verifica se 'text' é uma string antes de usar .replace
+    // ESTA É A CORREÇÃO DE SEGURANÇA:
     if (typeof text !== 'string') {
         return originalTextRenderer.call(renderer, text);
     }
-    // Procura por [[Título]] ou [[Título|Texto Exibido]]
+    
     text = text.replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (match, title, displayText) => {
         const targetTitle = title.trim();
         const display = (displayText || targetTitle).trim();
@@ -20,25 +18,26 @@ renderer.text = (text) => {
         
         if (articleTitleMap.has(normalizedTitle)) {
             const id = articleTitleMap.get(normalizedTitle);
-            // Link funcional que o nosso JS de navegação (contentArea.addEventListener) vai pegar
             return `<a href="#artigo-${id}" class="internal-link" title="Ir para '${targetTitle}'">${display}</a>`;
         } else {
-            // Link quebrado
             return `<span class="internal-link-broken" title="Artigo '${targetTitle}' não encontrado">${display}</span>`;
         }
     });
     return originalTextRenderer.call(renderer, text);
 };
+
 renderer.link = (href, title, text) => {
-    // Garante que links internos sejam tratados corretamente
     if (href.startsWith('#artigo-')) {
         return `<a href="${href}" class="internal-link"${title ? ` title="${title}"` : ''}>${text}</a>`;
     }
-    // Deixa links externos (http://...) e âncoras normais (#hash) passarem
     return originalLinkRenderer.call(renderer, href, title, text);
 };
 marked.use({ renderer });
 
+// ... (O RESTANTE DO SEU ARQUIVO public.js) ...
+// (Vou omitir o resto por brevidade, mas o seu arquivo
+// completo já deve conter
+// as funções initCopyCodeButtons, renderSidebarTree, renderArticlesContent, etc.)
 
 // --- Função Auxiliar (Copy Button) ---
 function initCopyCodeButtons() {

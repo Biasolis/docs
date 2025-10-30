@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await fetchArticleContent(articleId);
 
         } catch (error) {
-            console.error("Erro na inicialização (preview):", error);
+            console.error("Na inicialização (preview):", error);
             contentArea.innerHTML = `<p style="color: red;">${error.message}</p>`;
         }
     }
