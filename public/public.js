@@ -8,10 +8,11 @@ const renderer = new marked.Renderer();
 const originalLinkRenderer = renderer.link; // Salva o renderizador de link original
 const originalTextRenderer = renderer.text; // Salva o renderizador de texto original
 renderer.text = (text) => {
-    // CORREÇÃO: Verifica se 'text' é uma string antes de usar .replace
+    // ESTA É A CORREÇÃO CRUCIAL PARA O ERRO 'parseInline'
     if (typeof text !== 'string') {
         return originalTextRenderer.call(renderer, text);
     }
+    
     // Procura por [[Título]] ou [[Título|Texto Exibido]]
     text = text.replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (match, title, displayText) => {
         const targetTitle = title.trim();
