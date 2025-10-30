@@ -1,44 +1,7 @@
-// /public/admin/preview.js (COMPLETO - CORRIGIDO)
+// /public/admin/preview.js (SIMPLIFICADO - SEM MARKED.JS)
 
 // 'token' e 'user' são declarados em 'auth.js'
-console.log('preview.js carregado.');
-
-// --- Mapa Global para Links Internos ---
-let articleTitleMap = new Map();
-
-// --- Configuração do Marked.js (COM CORREÇÃO) ---
-const renderer = new marked.Renderer();
-const originalLinkRenderer = renderer.link; 
-const originalTextRenderer = renderer.text; 
-renderer.text = (text) => {
-    // (CORREÇÃO) Adiciona verificação para garantir que 'text' é uma string
-    if (typeof text !== 'string') {
-        return originalTextRenderer.call(renderer, text);
-    }
-    
-    // Procura por [[Título]] ou [[Título|Texto Exibido]]
-    text = text.replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (match, title, displayText) => {
-        const targetTitle = title.trim();
-        const display = (displayText || targetTitle).trim();
-        const normalizedTitle = targetTitle.toLowerCase();
-        
-        if (articleTitleMap.has(normalizedTitle)) {
-            const id = articleTitleMap.get(normalizedTitle);
-            return `<a href="/#artigo-${id}" target="_blank" class="internal-link" title="Abrir '${targetTitle}' em nova aba">${display}</a>`;
-        } else {
-            return `<span class="internal-link-broken" title="Artigo '${targetTitle}' não encontrado">${display}</span>`;
-        }
-    });
-    return originalTextRenderer.call(renderer, text);
-};
-renderer.link = (href, title, text) => {
-    if (href.startsWith('/#artigo-')) {
-        return `<a href="${href}" target="_blank" class="internal-link"${title ? ` title="${title}"` : ''}>${text}</a>`;
-    }
-    return originalLinkRenderer.call(renderer, href, title, text);
-};
-marked.use({ renderer });
-
+console.log('preview.js carregado (Modo SSR).');
 
 // --- Função Auxiliar (Copy Button) ---
 function initCopyCodeButtons() {
@@ -72,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         try {
+            // Esta rota agora retorna 'content_html'
             const response = await fetch(`/api/articles/${articleId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -83,9 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const article = await response.json();
             
-            // CORREÇÃO: Garante que estamos passando uma string para o marked.parse
-            const markdownContent = article.content_markdown || '';
-            const contentHtml = marked.parse(markdownContent);
+            // Pega o HTML pronto da API, em vez de usar marked.parse()
+            const contentHtml = article.content_html || '';
             
             contentArea.innerHTML = `
                 <h2>${article.title}</h2>
@@ -93,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p class="article-author"><em>Autor: ${article.author_username} (Criado em: ${new Date(article.created_at).toLocaleDateString('pt-BR')})</em></p>
             `;
             
-            initCopyCodeButtons();
+            initCopyCodeButtons(); // Adiciona botões de copiar
 
         } catch (error) {
             console.error("Erro ao carregar (preview):", error);
@@ -106,20 +69,12 @@ document.addEventListener('DOMContentLoaded', () => {
         contentArea.innerHTML = '<h2>Carregando...</h2>';
         
         try {
-            // 1. Busca o mapa de títulos
-            const titlesResponse = await fetch('/api/articles/public-titles');
-            if (!titlesResponse.ok) throw new Error('Erro ao buscar mapa de títulos.');
-            const titles = await titlesResponse.json();
-            
-            articleTitleMap.clear();
-            titles.forEach(t => { articleTitleMap.set(t.title.toLowerCase().trim(), t.id); });
-            console.log("Mapa de títulos carregado (preview):", articleTitleMap.size, "entradas.");
-
-            // 2. Pega o ID do artigo da URL
+            // Pega o ID do artigo da URL
             const urlParams = new URLSearchParams(window.location.search);
             const articleId = urlParams.get('id');
 
-            // 3. Busca e renderiza o conteúdo do artigo
+            // Busca e renderiza o conteúdo do artigo (que já virá em HTML)
+            // (Não precisamos mais buscar mapa de títulos)
             await fetchArticleContent(articleId);
 
         } catch (error) {

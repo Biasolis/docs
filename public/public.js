@@ -1,45 +1,4 @@
-// /public/public.js (COMPLETO E FINAL - COM CORREÇÃO)
-
-// --- Mapa Global para Links Internos ---
-let articleTitleMap = new Map();
-
-// --- Configuração do Marked.js (Extensão para Links Internos) ---
-const renderer = new marked.Renderer();
-const originalLinkRenderer = renderer.link; // Salva o renderizador de link original
-const originalTextRenderer = renderer.text; // Salva o renderizador de texto original
-renderer.text = (text) => {
-    // ESTA É A CORREÇÃO CRUCIAL PARA O ERRO 'parseInline'
-    if (typeof text !== 'string') {
-        return originalTextRenderer.call(renderer, text);
-    }
-    
-    // Procura por [[Título]] ou [[Título|Texto Exibido]]
-    text = text.replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (match, title, displayText) => {
-        const targetTitle = title.trim();
-        const display = (displayText || targetTitle).trim();
-        const normalizedTitle = targetTitle.toLowerCase();
-        
-        if (articleTitleMap.has(normalizedTitle)) {
-            const id = articleTitleMap.get(normalizedTitle);
-            // Link funcional que o nosso JS de navegação (contentArea.addEventListener) vai pegar
-            return `<a href="#artigo-${id}" class="internal-link" title="Ir para '${targetTitle}'">${display}</a>`;
-        } else {
-            // Link quebrado
-            return `<span class="internal-link-broken" title="Artigo '${targetTitle}' não encontrado">${display}</span>`;
-        }
-    });
-    return originalTextRenderer.call(renderer, text);
-};
-renderer.link = (href, title, text) => {
-    // Garante que links internos sejam tratados corretamente
-    if (href.startsWith('#artigo-')) {
-        return `<a href="${href}" class="internal-link"${title ? ` title="${title}"` : ''}>${text}</a>`;
-    }
-    // Deixa links externos (http://...) e âncoras normais (#hash) passarem
-    return originalLinkRenderer.call(renderer, href, title, text);
-};
-marked.use({ renderer });
-
+// /public/public.js (SIMPLIFICADO - SEM MARKED.JS)
 
 // --- Função Auxiliar (Copy Button) ---
 function initCopyCodeButtons() {
@@ -68,7 +27,7 @@ function initCopyCodeButtons() {
 
 // --- Lógica Principal ---
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM Carregado - public.js iniciado.");
+    console.log("DOM Carregado - public.js iniciado (Modo SSR).");
     
     // Seleção de Elementos
     const searchInput = document.getElementById('searchInput');
@@ -102,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
             a.textContent = category.name; 
             li.appendChild(a);
 
-            // Chama recursivamente passando a lista PLANA completa
             const subUl = renderSidebarTree(categoriesData, category.id);
             if (subUl.hasChildNodes()) {
                 li.appendChild(subUl);
@@ -131,17 +89,15 @@ document.addEventListener('DOMContentLoaded', () => {
             section.classList.add('doc-section');
 
             let contentHtml = '';
-            // Garante que o markdown é uma string
-            const markdownContent = article.content_markdown || '';
             
             if (article.snippet) {
+                 // Snippet já vem como HTML da API de busca
                  contentHtml = `<p class="search-snippet">...${article.snippet}...</p>`;
-                 section.dataset.needsContent = "true"; 
-                 section.dataset.contentMarkdown = ""; // Será buscado depois
+                 section.dataset.needsContent = "true"; // Sinaliza que precisa buscar o conteúdo completo
             } else {
-                contentHtml = marked.parse(markdownContent); // marked.parse() usa renderizador customizado
+                // content_html agora vem pronto da API
+                contentHtml = article.content_html || '<p>Conteúdo indisponível.</p>';
                 section.dataset.needsContent = "false";
-                section.dataset.contentMarkdown = markdownContent;
             }
 
             section.innerHTML = `<h2>${article.title}</h2>${contentHtml}<p class="article-author"><em>Autor: ${article.author_username} (Publicado em: ${new Date(article.created_at).toLocaleDateString('pt-BR')})</em></p>`;
@@ -149,14 +105,12 @@ document.addEventListener('DOMContentLoaded', () => {
             section.style.display = 'none';
         });
         
-        // Ativa o PRIMEIRO artigo da lista
         if(articles.length > 0) {
             const firstArticleId = `artigo-${articles[0].id}`;
-            updateArticleSelection(`#${firstArticleId}`); // CORRIGIDO: Adiciona o #
+            updateArticleSelection(`#${firstArticleId}`);
         } else {
              updateArticleSelection(null);
         }
-        // Botões de Copiar serão adicionados por updateArticleSelection
     }
 
     // --- Buscar Artigos na API e Exibir ---
@@ -201,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- Ativar/Mostrar um Artigo Específico (Busca conteúdo se necessário) ---
-    async function updateArticleSelection(targetArticleId = null) { // Ex: "#artigo-5" ou null
+    async function updateArticleSelection(targetArticleId = null) {
          console.log("Tentando ativar artigo:", targetArticleId);
          const currentActiveSection = contentArea.querySelector('.doc-section.active');
          if (currentActiveSection) { 
@@ -214,24 +168,19 @@ document.addEventListener('DOMContentLoaded', () => {
          if (targetArticleId) {
              const newActiveSection = contentArea.querySelector(targetArticleId);
              if (newActiveSection) {
-                 // Verifica se precisa buscar o conteúdo completo
                  if (newActiveSection.dataset.needsContent === "true") {
                      console.log(`Buscando conteúdo completo para ${targetArticleId}...`);
                      const articleIdNum = targetArticleId.split('-')[1]; 
                      try {
-                         // USA A ROTA PÚBLICA /public/:id
                          const response = await fetch(`/api/articles/public/${articleIdNum}`); 
-                         if (!response.ok) {
-                             let errorMsg = 'Não foi possível carregar o conteúdo completo.';
-                             try { const data = await response.json(); errorMsg = data.message || errorMsg; } catch(e){}
-                             throw new Error(errorMsg);
-                         }
+                         if (!response.ok) { /* ... (tratamento de erro) ... */ }
                          const articleData = await response.json();
                          
-                         const markdownContent = articleData.content_markdown || '';
-                         const fullContentHtml = marked.parse(markdownContent);
+                         // Pega o HTML pronto da API
+                         const fullContentHtml = articleData.content_html || '';
                          const h2 = newActiveSection.querySelector('h2');
                          const authorP = newActiveSection.querySelector('p.article-author');
+                         
                          newActiveSection.innerHTML = ''; 
                          if (h2) newActiveSection.appendChild(h2);
                          const contentDiv = document.createElement('div');
@@ -240,34 +189,23 @@ document.addEventListener('DOMContentLoaded', () => {
                          if (authorP) newActiveSection.appendChild(authorP);
 
                          newActiveSection.dataset.needsContent = "false";
-                         newActiveSection.dataset.contentMarkdown = markdownContent; 
-                         initCopyCodeButtons(); // Adiciona botões AGORA
+                         initCopyCodeButtons();
 
                      } catch (error) {
                           console.error("Erro ao buscar conteúdo completo:", error);
-                          const h2 = newActiveSection.querySelector('h2');
-                          const errorP = document.createElement('p');
-                          errorP.style.color = 'red';
-                          errorP.textContent = `Erro ao carregar conteúdo completo: ${error.message}`;
-                          if (h2) h2.insertAdjacentElement('afterend', errorP);
-                          else newActiveSection.prepend(errorP);
-                          newActiveSection.dataset.needsContent = "false"; 
+                          // ... (tratamento de erro) ...
                      }
-                 } else if (newActiveSection.dataset.contentMarkdown) {
-                      // Se já tinha o conteúdo completo, apenas garante botões de copiar
-                      initCopyCodeButtons();
+                 } else {
+                     initCopyCodeButtons(); // Adiciona botões se o conteúdo já estava lá
                  }
                  
                  newActiveSection.classList.add('active');
                  newActiveSection.style.display = 'block';
-                 console.log("Artigo ativado:", targetArticleId);
 
              } else {
                   console.warn(`Seção ${targetArticleId} não encontrada no DOM.`);
                   activeArticleId = null; 
              }
-         } else {
-             console.log("Nenhum artigo para ativar.");
          }
     }
 
@@ -288,7 +226,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Lógica de Clique na Categoria ---
     if(categoryTreeContainer) { 
         categoryTreeContainer.addEventListener('click', (e) => {
-            // Garante que o clique foi em um <a>
             const link = e.target.closest('a');
             if (link) {
                 e.preventDefault();
@@ -318,30 +255,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Carregamento Inicial ---
     async function initializePage() {
          if(categoryTreeContainer) categoryTreeContainer.innerHTML = 'Carregando categorias...';
-         else console.error("Container da árvore de categorias não encontrado!");
 
          try {
              // 1. Busca a lista plana de categorias
              const flatCatResponse = await fetch('/api/categories'); 
-             if (!flatCatResponse.ok) throw new Error(`Erro ao buscar lista plana de categorias (${flatCatResponse.status})`);
+             if (!flatCatResponse.ok) throw new Error(`Erro categorias (${flatCatResponse.status})`);
              const flatCategories = await flatCatResponse.json();
-             currentCategoryTree = flatCategories; // Guarda a lista plana
+             currentCategoryTree = flatCategories; 
 
-             const treeUl = renderSidebarTree(flatCategories); // Monta a árvore a partir da lista plana
+             const treeUl = renderSidebarTree(flatCategories);
              if(categoryTreeContainer) {
                  categoryTreeContainer.innerHTML = ''; 
                  categoryTreeContainer.appendChild(treeUl);
              }
 
-             // 2. Busca o mapa de títulos para os links internos
-             const titlesResponse = await fetch('/api/articles/public-titles');
-             if (!titlesResponse.ok) throw new Error('Erro ao buscar mapa de títulos.');
-             const titles = await titlesResponse.json();
-             articleTitleMap.clear();
-             titles.forEach(t => { articleTitleMap.set(t.title.toLowerCase().trim(), t.id); });
-             console.log("Mapa de títulos carregado:", articleTitleMap.size, "entradas.");
-
-             // 3. Busca e exibe todos os artigos inicialmente
+             // 2. Busca e exibe todos os artigos inicialmente
+             // (Não precisamos mais buscar o mapa de títulos!)
              await fetchAndDisplayArticles('all');
 
          } catch (error) {

@@ -1,22 +1,31 @@
-// /backend/routes/articles.js (COMPLETO E FINAL - COM SHARP, ROTAS PÚBLICAS, FTS, 3 STATUS, CATEGORIAS, SNIPPETS)
+// /backend/routes/articles.js (MODIFICADO PARA SSR)
 const express = require('express');
-const db = require('../db'); // Certifique-se que db.js exporta { query, pool }
+const db = require('../db');
 const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs'); // Módulo File System
-const sharp = require('sharp'); // Biblioteca de imagens
+const sharp = require('sharp');
+const { parseMarkdown } = require('../markdown-parser'); // <-- IMPORTA NOSSO PARSER
 
 const router = express.Router();
 
-// --- Configuração do Multer (USA MEMÓRIA PARA SHARP) ---
+// --- Configuração do Multer ---
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
-// --------------------------------------------------
 
-// == ROTAS PÚBLICAS (Visível para TODOS - status 'published_public') ==
+// --- Função Auxiliar para converter artigos ---
+// Converte 'content_markdown' para 'content_html' em uma lista de artigos
+async function convertArticlesToHtml(articles) {
+    for (const article of articles) {
+        article.content_html = await parseMarkdown(article.content_markdown);
+        delete article.content_markdown;
+    }
+    return articles;
+}
 
-// ROTA: GET /api/articles/public (Lista APENAS 'published_public')
+// == ROTAS PÚBLICAS (Visível para TODOS) ==
+
+// ROTA: GET /api/articles/public
 router.get('/public', async (req, res) => {
     try {
         const query = `
@@ -26,30 +35,21 @@ router.get('/public', async (req, res) => {
             ORDER BY a.title;
         `;
         const result = await db.query(query);
-        // Adiciona snippet: null para consistência com a busca
-        res.json(result.rows.map(row => ({...row, snippet: null })));
+        // Converte Markdown para HTML antes de enviar
+        const articlesWithHtml = await convertArticlesToHtml(result.rows);
+        res.json(articlesWithHtml.map(row => ({...row, snippet: null })));
     } catch (err) {
         console.error("Erro em GET /api/articles/public:", err);
         res.status(500).json({ message: 'Erro no servidor', error: err.message });
     }
 });
 
-// ROTA: GET /api/articles/search?q=termo (Busca APENAS 'published_public' com FTS + Snippets)
+// ROTA: GET /api/articles/search?q=termo
 router.get('/search', async (req, res) => {
     const searchTerm = req.query.q;
-    if (!searchTerm || searchTerm.trim() === '') { // Busca vazia
-        try {
-            const query = `
-                SELECT a.id, a.title, a.content_markdown, a.status, a.created_at, u.username AS author_username
-                FROM articles a JOIN users u ON a.author_id = u.id
-                WHERE a.status = 'published_public' ORDER BY a.title;
-            `;
-            const result = await db.query(query);
-            return res.json(result.rows.map(row => ({...row, snippet: null })));
-        } catch (err) {
-             console.error("Erro em GET /api/articles/search (vazio):", err);
-             return res.status(500).json({ message: 'Erro no servidor', error: err.message });
-        }
+    if (!searchTerm || searchTerm.trim() === '') {
+        // Busca vazia, reutiliza a lógica do /public
+        return router.handle({ method: 'GET', url: '/public' }, res);
     }
     // Busca com termo
     try {
@@ -64,14 +64,15 @@ router.get('/search', async (req, res) => {
         `;
         const params = [searchTerm];
         const result = await db.query(query, params);
-        res.json(result.rows); // Retorna com snippet
+        // Nota: O 'snippet' já vem como HTML, não precisamos converter
+        res.json(result.rows);
     } catch (err) {
         console.error("Erro em GET /api/articles/search (FTS):", err);
         res.status(500).json({ message: 'Erro no servidor', error: err.message });
     }
 });
 
-// ROTA: GET /api/articles/category/:categoryId (Lista PÚBLICOS de uma categoria)
+// ROTA: GET /api/articles/category/:categoryId
 router.get('/category/:categoryId', async (req, res) => {
      const { categoryId } = req.params;
     if (!/^\d+$/.test(categoryId)) return res.status(400).json({ message: 'ID categoria inválido.' });
@@ -82,14 +83,16 @@ router.get('/category/:categoryId', async (req, res) => {
             WHERE a.status = 'published_public' AND ac.category_id = $1 ORDER BY a.title;
         `;
         const result = await db.query(query, [categoryId]);
-        res.json(result.rows.map(row => ({...row, snippet: null }))); // Adiciona snippet null
+        // Converte Markdown para HTML antes de enviar
+        const articlesWithHtml = await convertArticlesToHtml(result.rows);
+        res.json(articlesWithHtml.map(row => ({...row, snippet: null })));
     } catch (err) {
         console.error(`Erro GET /category/${categoryId}:`, err);
         res.status(500).json({ message: 'Erro buscar por categoria', error: err.message });
     }
 });
 
-// ROTA PÚBLICA: GET /api/articles/public/:id (Busca UM artigo PÚBLICO completo)
+// ROTA PÚBLICA: GET /api/articles/public/:id
 router.get('/public/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -97,21 +100,26 @@ router.get('/public/:id', async (req, res) => {
         const query = `
             SELECT a.*, u.username AS author_username
             FROM articles a JOIN users u ON a.author_id = u.id
-            WHERE a.id = $1 AND a.status = 'published_public'; -- Só retorna se for público
+            WHERE a.id = $1 AND a.status = 'published_public';
         `;
         const result = await db.query(query, [id]);
         if (result.rowCount === 0) return res.status(404).json({ message: 'Artigo não encontrado ou não é público.' });
         
+        const article = result.rows[0];
+        
+        // Converte Markdown para HTML
+        article.content_html = await parseMarkdown(article.content_markdown);
+        delete article.content_markdown;
+
         const categoriesQuery = `SELECT category_id FROM article_categories WHERE article_id = $1;`;
         const categoriesResult = await db.query(categoriesQuery, [id]);
-        const article = result.rows[0];
         article.category_ids = categoriesResult.rows.map(row => row.category_id); 
         
-        res.json(article); // Retorna o artigo completo
+        res.json(article);
     } catch (err) { console.error(`Erro GET /public/${req.params.id}:`, err); res.status(500).json({ message: 'Erro servidor', error: err.message }); }
 });
 
-// ROTA PÚBLICA: GET /api/articles/public-titles (Lista Títulos e IDs para links internos)
+// ROTA PÚBLICA: GET /api/articles/public-titles (Esta não muda)
 router.get('/public-titles', async (req, res) => {
     try {
         const query = `SELECT id, title FROM articles WHERE status = 'published_public' ORDER BY title;`;
@@ -123,16 +131,16 @@ router.get('/public-titles', async (req, res) => {
 
 // == ROTAS PROTEGIDAS (Requer Login) ==
 
-// ROTA: GET /api/articles (Listar artigos visíveis para o usuário logado)
+// ROTA: GET /api/articles (Esta não precisa de conversão, é só a lista)
 router.get('/', verifyToken, async (req, res) => {
     try {
         let query;
-        if (req.user.role === 'admin') { // Admin vê TUDO
+        if (req.user.role === 'admin') {
             query = `
                 SELECT a.id, a.title, a.status, a.created_at, a.updated_at, u.username AS author_username
                 FROM articles a JOIN users u ON a.author_id = u.id ORDER BY a.title;
             `;
-        } else { // Usuário comum vê internal e public
+        } else {
             query = `
                 SELECT a.id, a.title, a.status, a.created_at, a.updated_at, u.username AS author_username
                 FROM articles a JOIN users u ON a.author_id = u.id
@@ -147,18 +155,23 @@ router.get('/', verifyToken, async (req, res) => {
     }
 });
 
-// ROTA: GET /api/articles/:id (Ver um artigo específico + SUAS CATEGORIAS)
+// ROTA: GET /api/articles/:id (Rota do Preview do Admin)
 router.get('/:id', verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
         const articleQuery = `SELECT a.*, u.username AS author_username FROM articles a JOIN users u ON a.author_id = u.id WHERE a.id = $1;`;
         const articleResult = await db.query(articleQuery, [id]);
         if (articleResult.rowCount === 0) return res.status(404).json({ message: 'Artigo não encontrado.' });
+        
         const article = articleResult.rows[0];
 
         if (article.status === 'draft' && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Acesso negado a este rascunho.' });
         }
+
+        // Converte Markdown para HTML
+        article.content_html = await parseMarkdown(article.content_markdown);
+        delete article.content_markdown;
 
         const categoriesQuery = `SELECT category_id FROM article_categories WHERE article_id = $1;`;
         const categoriesResult = await db.query(categoriesQuery, [id]);
@@ -172,10 +185,11 @@ router.get('/:id', verifyToken, async (req, res) => {
     }
 });
 
-// == ROTAS DE ADMIN ==
+// == ROTAS DE ADMIN (POST, PUT, DELETE não mudam) ==
 
-// ROTA: POST /api/articles (Criar novo artigo + ASSOCIAÇÕES)
+// ROTA: POST /api/articles
 router.post('/', verifyToken, isAdmin, async (req, res) => {
+    // ... (código original sem alteração) ...
     const { title, content_markdown, status, category_ids = [] } = req.body;
     const author_id = req.user.id;
     const validStatuses = ['draft', 'published_internal', 'published_public'];
@@ -208,8 +222,9 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
-// ROTA: PUT /api/articles/:id (Editar artigo + ASSOCIAÇÕES)
+// ROTA: PUT /api/articles/:id
 router.put('/:id', verifyToken, isAdmin, async (req, res) => {
+    // ... (código original sem alteração) ...
     const { id } = req.params;
     const { title, content_markdown, status, category_ids = [] } = req.body;
     const validStatuses = ['draft', 'published_internal', 'published_public'];
@@ -249,11 +264,11 @@ router.put('/:id', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
-// ROTA: DELETE /api/articles/:id (Apagar artigo - admin)
+// ROTA: DELETE /api/articles/:id
 router.delete('/:id', verifyToken, isAdmin, async (req, res) => {
+    // ... (código original com a correção de 'users' para 'articles') ...
     const { id } = req.params;
     try {
-        // CORREÇÃO: Estava apagando da tabela 'users' em vez de 'articles'
         const result = await db.query('DELETE FROM articles WHERE id = $1', [id]);
         if (result.rowCount === 0) return res.status(404).json({ message: 'Artigo não encontrado.' });
         res.status(204).send();
@@ -263,8 +278,9 @@ router.delete('/:id', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
-// (ROTA MODIFICADA - USA SHARP) POST /api/articles/upload-image
+// ROTA: POST /api/articles/upload-image
 router.post('/upload-image', verifyToken, isAdmin, upload.single('image'), async (req, res) => {
+    // ... (código original sem alteração) ...
     if (!req.file) return res.status(400).json({ message: 'Nenhum arquivo.' });
     try {
         const timestamp = Date.now();
