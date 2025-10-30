@@ -1,0 +1,37 @@
+# Dependências do Node.js
+# Esta é a pasta mais importante a ser ignorada.
+node_modules/
+
+# Arquivos de Log
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos de Ambiente
+# Arquivos .env contêm segredos, senhas de banco e chaves de API.
+# NUNCA envie estes arquivos para o Git.
+.env
+.env.local
+.env.development
+.env.production
+
+# Arquivos de Sistema Operacional
+.DS_Store
+Thumbs.db
+._*
+
+# Arquivos de IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Arquivos de Build/Pacote (Caso você use no futuro)
+dist/
+build/
+*.zip
+*.tar.gz
+
+# Arquivos temporários do npm (se ocorrerem)
+.npm/

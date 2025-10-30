@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Usuários - Admin Docs</title>
+    
+    <link rel="icon" href="/images/logo.old.png" type="image/png">
+    
+    <script src="/admin/admin-guard.js"></script>
+    
+    <link rel="stylesheet" href="/admin/admin.css">
+    
+    <script src="/darkmode.js"></script>
+</head>
+<body>
+
+    <header class="admin-header">
+        <div class="header-container">
+             <div class="logo-container">
+                <img src="/images/logo.old.png" alt="Logo" class="admin-logo">
+                <h2>Gerenciar Usuários</h2>
+            </div>
+            <nav>
+                <span id="user-welcome" class="user-info"></span>
+                <a href="/admin/profile.html" class="user-info-link">Meu Perfil</a>
+                 <div class="theme-switch-wrapper">
+                    <label class="theme-switch" for="darkModeToggle">
+                        <input type="checkbox" id="darkModeToggle" />
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <a href="/admin/dashboard.html">Voltar aos Artigos</a>
+                <a href="/" target="_blank">Ver Site Público</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="admin-main">
+        <div class="user-manager-container">
+            
+            <div class="user-form-card">
+                <h3 id="formTitle">Adicionar Novo Usuário</h3>
+                <form id="userForm">
+                    <input type="hidden" id="userId">
+                    
+                    <div class="form-group">
+                        <label for="username">Nome de Usuário (Exibição):</label>
+                        <input type="text" id="username" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email (para login):</label>
+                        <input type="email" id="email" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Senha:</label>
+                        <input type="password" id="password">
+                        <small>Deixe em branco para manter a senha atual (ao editar).</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="role">Permissão:</label>
+                        <select id="role" required>
+                            <option value="user">Usuário (Apenas visualiza)</option>
+                            <option value="admin">Admin (Gerencia tudo)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Salvar</button>
+                        <button type="button" id="cancelButton" class="btn-secondary" style="display: none;">Cancelar Edição</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="content-table user-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Usuário</th>
+                            <th>Email</th>
+                            <th>Permissão</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-list">
+                        </tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="/admin/manage-users.js"></script>
+</body>
+</html>

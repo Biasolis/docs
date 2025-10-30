@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central de Ajuda</title>
+    
+    <link rel="icon" href="/images/logo.old.png" type="image/png">
+    <link rel="stylesheet" href="/style.css"> <script src="/darkmode.js"></script> </head>
+<body>
+
+    <header>
+        <div class="logo-container-public">
+            <img src="/images/logo.old.png" alt="Logo">
+            <h1>Nossa Central de Ajuda</h1>
+        </div>
+        <div class="theme-switch-wrapper">
+            <label class="theme-switch" for="darkModeToggle"><input type="checkbox" id="darkModeToggle" /><span class="slider round"></span></label>
+        </div>
+    </header>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h2>Tópicos</h2>
+            <div class="search-container">
+                <input type="search" id="searchInput" placeholder="Buscar artigos...">
+            </div>
+            
+            <nav>
+                <div id="category-tree-container">
+                    Carregando categorias...
+                </div>
+            </nav>
+        </aside>
+
+        <main class="content">
+            </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/public.js"></script> </body>
+</html>

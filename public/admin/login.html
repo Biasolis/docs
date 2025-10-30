@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Admin Docs</title>
+    
+    <link rel="icon" href="/images/logo.old.png" type="image/png">
+    
+    <link rel="stylesheet" href="/admin/admin.css">
+    
+    <script src="/darkmode.js"></script>
+</head>
+<body>
+    <div class="login-container">
+        
+        <div class="login-logo-container">
+            <img src="/images/logo.old.png" alt="Logo">
+        </div>
+
+        <h2>Login - Central de Documentação</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Senha:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Entrar</button>
+            <p id="errorMessage" class="error-message"></p>
+        </form>
+    </div>
+
+    <script src="/admin/login.js"></script>
+</body>
+</html>

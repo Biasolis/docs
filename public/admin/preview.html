@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizando Artigo</title>
+    
+    <link rel="icon" href="/images/logo.old.png" type="image/png">
+    
+    <script src="/admin/auth.js"></script>
+    
+    <link rel="stylesheet" href="/style.css"> 
+    
+    <script src="/darkmode.js"></script>
+    
+    <style>
+        body { background-color: #f9f9f9; }
+        .container { 
+            display: block; 
+            max-width: 900px;
+            margin: 0 auto;
+        } 
+        .content { 
+            margin: 20px 0;
+            min-height: 0;
+            width: 100%;
+        }
+        .admin-preview-bar {
+            background: #fff;
+            padding: 10px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            text-align: center;
+            font-weight: bold;
+            color: #0056b3;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex; /* Para alinhar o switch */
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        /* DARK MODE - Preview Specifics */
+        body.dark-mode .admin-preview-bar {
+            background-color: #1E1E1E;
+            border-bottom-color: #333;
+            color: #e0e0e0;
+        }
+        body.dark-mode {
+             background-color: #121212;
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="admin-preview-bar">
+        <span>Modo de Visualização</span>
+        <div class="theme-switch-wrapper">
+            <label class="theme-switch" for="darkModeToggle">
+                <input type="checkbox" id="darkModeToggle" />
+                <span class="slider round"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="container">
+        <main class="content" id="preview-content">
+            <h2>Carregando...</h2>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/admin/preview.js"></script>
+</body>
+</html>

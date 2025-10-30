@@ -1,0 +1,42 @@
+# /docker-compose.yml (NOVO ARQUIVO)
+
+version: '3.8'
+
+services:
+  # O nome do nosso serviço/container
+  docs_app:
+    # Constrói a imagem usando o Dockerfile no diretório atual
+    build: .
+    # Nome da imagem que será criada
+    image: consorciomagalu/docs-app:latest
+    # Reinicia o container automaticamente se ele falhar
+    restart: unless-stopped
+    # Mapeia a porta 3000 do HOST para a porta 3000 do CONTAINER
+    # O Nginx do host irá se conectar em localhost:3000
+    ports:
+      - "3055:3055"
+    
+    # (ESSENCIAL) Adiciona "host.docker.internal" como um host
+    # que aponta para o gateway do Docker. Isso permite
+    # que o container acesse o PostgreSQL que está rodando no HOST.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      
+    # Variáveis de ambiente que serão injetadas no container
+    # ATENÇÃO: Substitua os valores abaixo pelos seus dados de produção
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=host.docker.internal # Aponta para o seu servidor (host)
+      - DB_USER=docs_user
+      - DB_PASSWORD=jJsxVBEZJu8n3wnSX92r
+      - DB_NAME=docs_db
+      - DB_PORT=5432 # Ou a porta que seu Postgres usa
+      - JWT_SECRET=6a4b7ce2bb794582490b81abeb8b4530b4c8f8b8207c3ae895757e7bee2ce4ae # Ex: use um gerador de senhas de 64 caracteres
+
+networks:
+  default:
+    # (OPCIONAL) Se seu Nginx (em Docker) e Postgres usam uma rede
+    # "bridge" específica (ex: "nginx_proxy"), coloque-a aqui.
+    # Se Nginx e Postgres estão no host, não precisa.
+    # name: sua_rede_externa
+    # external: true

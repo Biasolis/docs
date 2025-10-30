@@ -1,0 +1,135 @@
+/* /public/admin/admin.css (COMPLETO - COM ESTILOS CATEGORIA NO EDITOR) */
+
+body { font-family: Arial, sans-serif; background-color: #f0f2f5; margin: 0; }
+.login-container { background-color: #ffffff; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); width: 350px; text-align: center; margin: 15vh auto; }
+.login-container h2 { margin-bottom: 1.5rem; color: #333; }
+.login-logo-container { text-align: center; margin-bottom: 1.5rem; }
+.login-logo-container img { height: 45px; width: auto; }
+.form-group { margin-bottom: 1rem; text-align: left; }
+.form-group label[for] { display: block; margin-bottom: 0.5rem; color: #555; }
+.form-group > label { display: block; margin-bottom: 0.5rem; color: #555; font-weight: bold; } /* Label geral */
+.form-group input[type="text"], .form-group input[type="password"], .form-group input[type="email"] { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 0.95rem; font-family: Arial, sans-serif; }
+.login-container button { width: 100%; padding: 0.75rem; border: none; border-radius: 4px; background-color: #007bff; color: white; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; }
+.login-container button:hover { background-color: #0056b3; }
+.error-message { margin-top: 1rem; color: #d93025; font-size: 0.9rem; }
+.admin-header { background-color: #ffffff; border-bottom: 1px solid #e0e0e0; padding: 0 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.header-container { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto; height: 60px; }
+.admin-header .logo-container { display: flex; align-items: center; gap: 15px; }
+.admin-header .admin-logo { height: 30px; width: auto; }
+.admin-header h2 { margin: 0; font-size: 1.25rem; color: #0056b3; }
+.admin-header nav { display: flex; align-items: center; gap: 1.5rem; }
+.admin-header nav a { text-decoration: none; color: #007bff; font-size: 0.9rem; }
+.user-info { color: #555; font-size: 0.9rem; font-weight: 500; }
+.user-info-link { font-size: 0.9rem; color: #0056b3; text-decoration: none; font-weight: 500; }
+.user-info-link:hover { text-decoration: underline; }
+.form-group input:disabled { background-color: #f4f4f4; color: #888; cursor: not-allowed; }
+.admin-main { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.toolbar h1 { margin: 0; font-weight: 600; }
+button { cursor: pointer; font-family: Arial, sans-serif; }
+.btn-primary { background-color: #007bff; color: white; padding: 0.75rem 1rem; border: none; border-radius: 4px; text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+.btn-primary:hover { background-color: #0056b3; }
+.btn-danger { background-color: #dc3545; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; font-size: 0.9rem; }
+.btn-danger:hover { background-color: #a71d2a; }
+.btn-view { display: inline-block; background-color: #17a2b8; color: white; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; text-decoration: none; line-height: 1.5; }
+.btn-view:hover { background-color: #117a8b; }
+.btn-edit { background-color: #007bff; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; margin-left: 0.5rem; }
+.btn-edit:hover { background-color: #0056b3; }
+.btn-danger-outline { background-color: transparent; color: #dc3545; border: 1px solid #dc3545; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; margin-left: 0.5rem; }
+.btn-danger-outline:hover { background-color: #dc3545; color: white; }
+.content-table { width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #f0f0f0; }
+th { background-color: #f9f9f9; font-weight: 600; color: #555; }
+td.actions { text-align: left; white-space: nowrap; }
+.status-publico { color: #28a745; font-weight: 500; }
+.status-privado { color: #fd7e14; font-weight: 500; } 
+.status-interno { color: #007bff; font-weight: 500; }
+.editor-container { background-color: #ffffff; padding: 1.5rem 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.editor-container .form-group input[type="text"] { font-size: 1.2rem; padding: 0.75rem; }
+.form-group label:not([for]) { display: flex; align-items: center; color: #555; font-weight: 500; cursor: pointer; margin-bottom: 1rem; }
+.form-group input[type="checkbox"] { margin-right: 0.5rem; width: 16px; height: 16px; accent-color: #007bff; }
+#editor { margin-top: 1.5rem; }
+.editor-actions { margin-top: 1.5rem; display: flex; justify-content: flex-end; }
+.user-manager-container { display: grid; grid-template-columns: 350px 1fr; gap: 2rem; }
+.user-form-card { background-color: #ffffff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); height: fit-content; }
+.user-form-card h3 { margin-top: 0; margin-bottom: 1.5rem; border-bottom: 1px solid #f0f0f0; padding-bottom: 1rem; }
+.form-group small { font-size: 0.8rem; color: #888; margin-top: 4px; display: block; }
+.form-group select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; background-color: #fff; font-family: Arial, sans-serif; font-size: 0.95rem; }
+.form-actions { margin-top: 1.5rem; display: flex; gap: 0.5rem; }
+.btn-secondary { background-color: #6c757d; color: white; padding: 0.75rem 1rem; border: none; border-radius: 4px; text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+.btn-secondary:hover { background-color: #5a6268; }
+input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, input:-webkit-autofill:active { box-shadow: 0 0 0 30px white inset !important; -webkit-text-fill-color: #333 !important; font-family: Arial, sans-serif; font-size: 0.95rem; }
+.theme-switch-wrapper { display: flex; align-items: center; }
+.theme-switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+.theme-switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; }
+.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; }
+input:checked + .slider { background-color: #007bff; }
+input:checked + .slider:before { transform: translateX(26px); }
+.slider.round { border-radius: 34px; }
+.slider.round:before { border-radius: 50%; }
+.category-manager-container { display: grid; grid-template-columns: 350px 1fr; gap: 2rem; }
+.category-form-card, .category-list-card { background-color: #ffffff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.category-form-card { height: fit-content; }
+.category-form-card h3, .category-list-card h3 { margin-top: 0; margin-bottom: 1.5rem; border-bottom: 1px solid #f0f0f0; padding-bottom: 1rem; }
+.category-tree { list-style: none; padding-left: 0; }
+.category-tree li { padding: 8px 0; border-bottom: 1px dashed #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+.category-tree li:last-child { border-bottom: none; }
+.category-actions button { font-size: 0.8rem; padding: 3px 8px; margin-left: 5px; }
+.btn-edit-cat { background-color: #ffc107; border-color: #ffc107; color: #333; } 
+.btn-edit-cat:hover { background-color: #d39e00; border-color: #d39e00; }
+.btn-delete-cat { background-color: transparent; color: #dc3545; border: 1px solid #dc3545; }
+.btn-delete-cat:hover { background-color: #dc3545; color: white; }
+.feedback-message { margin-top: 1rem; font-size: 0.9rem; font-weight: 500; }
+.feedback-message.success { color: green; }
+.feedback-message.error { color: red; }
+@media (max-width: 900px) { .user-manager-container, .category-manager-container { grid-template-columns: 1fr; } } 
+body.dark-mode { background-color: #121212; color: #e0e0e0; }
+body.dark-mode .admin-header, body.dark-mode .login-container, body.dark-mode .content-table, body.dark-mode .editor-container, body.dark-mode .user-form-card, body.dark-mode .category-form-card, body.dark-mode .category-list-card { background-color: #1E1E1E; border-color: #333; color: #e0e0e0; } 
+body.dark-mode .login-container h2, body.dark-mode .admin-header h2, body.dark-mode .toolbar h1, body.dark-mode .user-form-card h3, body.dark-mode .category-form-card h3, body.dark-mode .category-list-card h3 { color: #007bff; } 
+body.dark-mode th { background-color: #2a2a2a; border-bottom-color: #333; color: #ccc; }
+body.dark-mode td { border-bottom-color: #333; }
+body.dark-mode .form-group label[for], body.dark-mode .form-group label:not([for]), body.dark-mode .user-info { color: #ccc; }
+body.dark-mode .form-group input[type="text"], body.dark-mode .form-group input[type="password"], body.dark-mode .form-group input[type="email"], body.dark-mode .form-group select, body.dark-mode .form-group input:disabled { background-color: #2a2a2a; border-color: #444; color: #e0e0e0; }
+body.dark-mode input:-webkit-autofill, body.dark-mode input:-webkit-autofill:hover, body.dark-mode input:-webkit-autofill:focus, body.dark-mode input:-webkit-autofill:active { box-shadow: 0 0 0 30px #2a2a2a inset !important; -webkit-text-fill-color: #e0e0e0 !important; }
+body.dark-mode .btn-danger-outline { color: #dc3545; border-color: #dc3545; }
+body.dark-mode .btn-danger-outline:hover { background-color: #dc3545; color: white; }
+body.dark-mode .status-interno { color: #3498db; }
+body.dark-mode .category-tree li { border-bottom-color: #333; } 
+body.dark-mode .feedback-message.success { color: #28a745; }
+body.dark-mode .feedback-message.error { color: #f8d7da; }
+
+/* (NOVO) Estilos para o Seletor de Categorias no Editor */
+.category-selector {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px 15px; /* Mais padding lateral */
+    max-height: 150px; /* Reduz altura máxima */
+    overflow-y: auto;
+    background-color: #fff; 
+}
+.category-checkbox-item {
+    margin-bottom: 8px; /* Mais espaço entre itens */
+}
+.category-checkbox-item label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: normal; 
+    color: #333; /* Cor padrão do texto */
+}
+.category-checkbox-item input[type="checkbox"] {
+    margin-right: 8px; 
+    width: 15px; /* Ajusta tamanho */
+    height: 15px; /* Ajusta tamanho */
+    accent-color: #007bff;
+}
+/* Dark Mode para Seletor de Categorias */
+body.dark-mode .category-selector {
+    background-color: #2a2a2a;
+    border-color: #444;
+}
+body.dark-mode .category-checkbox-item label {
+    color: #ccc;
+}
