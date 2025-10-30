@@ -253,8 +253,9 @@ router.put('/:id', verifyToken, isAdmin, async (req, res) => {
 router.delete('/:id', verifyToken, isAdmin, async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await db.query('DELETE FROM users WHERE id = $1', [id]);
-        if (result.rowCount === 0) return res.status(404).json({ message: 'Usuário não encontrado.' });
+        // CORREÇÃO: Estava apagando da tabela 'users' em vez de 'articles'
+        const result = await db.query('DELETE FROM articles WHERE id = $1', [id]);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Artigo não encontrado.' });
         res.status(204).send();
     } catch (err) {
         console.error(`Erro em DELETE /api/articles/${id}:`, err);
