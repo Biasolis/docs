@@ -1,4 +1,5 @@
 // /public/admin/preview.js (SIMPLIFICADO - SEM MARKED.JS)
+//
 
 // 'token' e 'user' são declarados em 'auth.js'
 console.log('preview.js carregado (Modo SSR).');
@@ -35,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         try {
-            // Esta rota agora retorna 'content_html'
+            // Esta rota agora retorna 'content_html' E 'content_markdown'
             const response = await fetch(`/api/articles/${articleId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -47,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const article = await response.json();
             
-            // Pega o HTML pronto da API, em vez de usar marked.parse()
+            // Pega o HTML pronto da API (vindo de 'content_html')
             const contentHtml = article.content_html || '';
             
             contentArea.innerHTML = `
@@ -74,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const articleId = urlParams.get('id');
 
             // Busca e renderiza o conteúdo do artigo (que já virá em HTML)
-            // (Não precisamos mais buscar mapa de títulos)
             await fetchArticleContent(articleId);
 
         } catch (error) {

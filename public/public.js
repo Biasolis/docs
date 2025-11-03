@@ -1,11 +1,11 @@
-// /public/public.js (SIMPLIFICADO - SEM MARKED.JS)
+// /public/public.js (ATUALIZADO - Com Lista/Índice de Artigos)
 
 // --- Função Auxiliar (Copy Button) ---
 function initCopyCodeButtons() {
     const codeBlocks = document.querySelectorAll('.content pre');
     codeBlocks.forEach(block => {
         const oldButton = block.querySelector('.copy-code-btn');
-        if(oldButton) oldButton.remove(); // Remove botão antigo se existir
+        if(oldButton) oldButton.remove(); 
 
         const button = document.createElement('button');
         button.className = 'copy-code-btn';
@@ -35,12 +35,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const contentArea = document.querySelector('.content');
 
     // Variáveis de Estado
-    let currentArticles = []; // Artigos atualmente exibidos
-    let currentCategoryTree = []; // Lista plana de categorias
-    let activeArticleId = null; // ID do artigo ativo (ex: "#artigo-5")
+    let currentArticles = [];
+    let currentCategoryTree = [];
+    let activeArticleId = null; 
 
     // --- Renderizar Árvore da Sidebar ---
     function renderSidebarTree(categoriesData, parentId = null) {
+        // ... (Esta função não muda) ...
         const ul = document.createElement('ul');
         if (parentId === null) ul.className = 'category-tree-public';
 
@@ -70,16 +71,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return ul;
     }
 
-
-    // --- Renderizar Artigos no Conteúdo (COM SNIPPET) ---
-    function renderArticlesContent(articles) {
-        contentArea.innerHTML = '';
-        
+    // --- Renderizar O CONTEÚDO (as seções escondidas) ---
+    // (Esta função foi simplificada para apenas ADICIONAR seções)
+    function renderArticleSections(articles) {
         if (!articles || articles.length === 0) {
-            const searchTerm = searchInput.value.trim();
-            contentArea.innerHTML = searchTerm !== '' ? '<p>Nenhum resultado encontrado para sua busca.</p>' : '<p>Nenhum documento encontrado para esta seleção.</p>';
-            updateArticleSelection(null);
-            return;
+            return; // O índice já terá a mensagem de "nenhum"
         }
 
         articles.forEach((article) => {
@@ -87,38 +83,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const section = document.createElement('section');
             section.id = articleId; 
             section.classList.add('doc-section');
-
-            let contentHtml = '';
             
+            // content_html agora vem pronto da API
+            let contentHtml = article.content_html || '<p>Conteúdo indisponível.</p>';
+            
+            // Se for resultado de busca (snippet), o conteúdo completo precisa ser buscado
             if (article.snippet) {
-                 // Snippet já vem como HTML da API de busca
-                 contentHtml = `<p class="search-snippet">...${article.snippet}...</p>`;
-                 section.dataset.needsContent = "true"; // Sinaliza que precisa buscar o conteúdo completo
+                 contentHtml = `<p class"search-snippet-placeholder">Carregando...</p>`;
+                 section.dataset.needsContent = "true";
             } else {
-                // content_html agora vem pronto da API
-                contentHtml = article.content_html || '<p>Conteúdo indisponível.</p>';
-                section.dataset.needsContent = "false";
+                 section.dataset.needsContent = "false";
             }
 
             section.innerHTML = `<h2>${article.title}</h2>${contentHtml}<p class="article-author"><em>Autor: ${article.author_username} (Publicado em: ${new Date(article.created_at).toLocaleDateString('pt-BR')})</em></p>`;
-            contentArea.appendChild(section);
-            section.style.display = 'none';
+            contentArea.appendChild(section); // Adiciona a seção
+            section.style.display = 'none'; // Esconde
         });
-        
-        if(articles.length > 0) {
-            const firstArticleId = `artigo-${articles[0].id}`;
-            updateArticleSelection(`#${firstArticleId}`);
-        } else {
-             updateArticleSelection(null);
-        }
     }
 
     // --- Buscar Artigos na API e Exibir ---
+    // (Esta função foi MODIFICADA para criar o ÍNDICE)
     async function fetchAndDisplayArticles(filterType = 'all', value = '') {
         let apiUrl = '';
         contentArea.innerHTML = '<p>Carregando...</p>'; 
 
         try {
+            // 1. Define a API URL
             if (filterType === 'search') apiUrl = `/api/articles/search?q=${encodeURIComponent(value)}`;
             else if (filterType === 'category') apiUrl = `/api/articles/category/${value}`;
             else apiUrl = '/api/articles/public';
@@ -129,8 +119,65 @@ document.addEventListener('DOMContentLoaded', () => {
             
             currentArticles = await response.json(); 
             console.log("Artigos recebidos:", currentArticles.length);
-            renderArticlesContent(currentArticles); 
+
+            // 2. Limpa a área de conteúdo
+            contentArea.innerHTML = '';
             
+            // 3. Renderiza o Título e o ÍNDICE (A NOVA LÓGICA)
+            const h2 = document.createElement('h2');
+            h2.className = 'content-index-title';
+            
+            if (filterType === 'search') {
+                h2.textContent = `Resultados para: "${value}"`;
+            } else if (filterType === 'category') {
+                const categoryLink = categoryTreeContainer.querySelector(`a[data-category-id="${value}"]`);
+                h2.textContent = categoryLink ? categoryLink.textContent : 'Artigos';
+            } else {
+                h2.textContent = 'Todos os Artigos';
+            }
+            contentArea.appendChild(h2);
+
+            // 4. Se não houver artigos, mostre a mensagem e pare
+            if (!currentArticles || currentArticles.length === 0) {
+                const searchTerm = searchInput.value.trim();
+                contentArea.innerHTML += searchTerm !== '' ? '<p>Nenhum resultado encontrado para sua busca.</p>' : '<p>Nenhum documento encontrado para esta seleção.</p>';
+                updateArticleSelection(null);
+                return;
+            }
+
+            // 5. Crie a lista (índice)
+            const indexUl = document.createElement('ul');
+            indexUl.className = 'article-index-list';
+            currentArticles.forEach(article => {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = `#artigo-${article.id}`; // Link para a âncora
+                a.className = 'internal-link'; // Reusa o estilo
+                a.textContent = article.title;
+                
+                // Se for busca, mostra o snippet no índice
+                if (article.snippet) {
+                    const snippetP = document.createElement('p');
+                    snippetP.className = 'search-snippet';
+                    snippetP.innerHTML = `...${article.snippet}...`;
+                    a.appendChild(snippetP);
+                }
+                
+                li.appendChild(a);
+                indexUl.appendChild(li);
+            });
+            contentArea.appendChild(indexUl);
+
+            // 6. Adiciona um <hr>
+            contentArea.appendChild(document.createElement('hr'));
+            
+            // 7. Renderiza o CONTEÚDO (as seções escondidas)
+            renderArticleSections(currentArticles); 
+            
+            // 8. Atualiza a seleção (não mostra nenhum artigo, só o índice)
+            updateArticleSelection(null);
+
+            // 9. Atualiza o sidebar
             if (filterType !== 'search') { 
                 updateSidebarSelection(filterType === 'all' ? null : parseInt(value));
             }
@@ -144,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Atualizar Seleção Visual da Categoria na Sidebar ---
     function updateSidebarSelection(activeCategoryId = null) {
+        // ... (Esta função não muda) ...
         if (!categoryTreeContainer) return; 
         categoryTreeContainer.querySelectorAll('a').forEach(a => {
             a.classList.remove('active-category');
@@ -154,7 +202,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // --- Ativar/Mostrar um Artigo Específico (Busca conteúdo se necessário) ---
+    // --- Ativar/Mostrar um Artigo Específico ---
+    // (Esta função foi MODIFICADA para esconder o ÍNDICE)
     async function updateArticleSelection(targetArticleId = null) {
          console.log("Tentando ativar artigo:", targetArticleId);
          const currentActiveSection = contentArea.querySelector('.doc-section.active');
@@ -162,12 +211,22 @@ document.addEventListener('DOMContentLoaded', () => {
              currentActiveSection.classList.remove('active');
              currentActiveSection.style.display = 'none';
          }
-
          activeArticleId = targetArticleId;
-         
+
+         // Seleciona os elementos do índice
+         const indexTitle = contentArea.querySelector('.content-index-title');
+         const indexList = contentArea.querySelector('.article-index-list');
+         const indexHr = contentArea.querySelector('hr');
+
          if (targetArticleId) {
+             // Esconde o índice
+             if (indexTitle) indexTitle.style.display = 'none';
+             if (indexList) indexList.style.display = 'none';
+             if (indexHr) indexHr.style.display = 'none';
+
              const newActiveSection = contentArea.querySelector(targetArticleId);
              if (newActiveSection) {
+                 // Busca conteúdo completo se for de snippet (needsContent === "true")
                  if (newActiveSection.dataset.needsContent === "true") {
                      console.log(`Buscando conteúdo completo para ${targetArticleId}...`);
                      const articleIdNum = targetArticleId.split('-')[1]; 
@@ -176,24 +235,17 @@ document.addEventListener('DOMContentLoaded', () => {
                          if (!response.ok) { /* ... (tratamento de erro) ... */ }
                          const articleData = await response.json();
                          
-                         // Pega o HTML pronto da API
                          const fullContentHtml = articleData.content_html || '';
-                         const h2 = newActiveSection.querySelector('h2');
-                         const authorP = newActiveSection.querySelector('p.article-author');
                          
-                         newActiveSection.innerHTML = ''; 
-                         if (h2) newActiveSection.appendChild(h2);
-                         const contentDiv = document.createElement('div');
-                         contentDiv.innerHTML = fullContentHtml;
-                         newActiveSection.appendChild(contentDiv);
-                         if (authorP) newActiveSection.appendChild(authorP);
-
+                         // Substitui o placeholder pelo conteúdo real
+                         const placeholder = newActiveSection.querySelector('.search-snippet-placeholder');
+                         if (placeholder) placeholder.innerHTML = fullContentHtml;
+                         
                          newActiveSection.dataset.needsContent = "false";
                          initCopyCodeButtons();
-
                      } catch (error) {
                           console.error("Erro ao buscar conteúdo completo:", error);
-                          // ... (tratamento de erro) ...
+                          newActiveSection.innerHTML += `<p style="color:red">Erro ao carregar.</p>`;
                      }
                  } else {
                      initCopyCodeButtons(); // Adiciona botões se o conteúdo já estava lá
@@ -206,6 +258,11 @@ document.addEventListener('DOMContentLoaded', () => {
                   console.warn(`Seção ${targetArticleId} não encontrada no DOM.`);
                   activeArticleId = null; 
              }
+         } else {
+             // Mostra o índice
+             if (indexTitle) indexTitle.style.display = 'block';
+             if (indexList) indexList.style.display = 'block';
+             if (indexHr) indexHr.style.display = 'block';
          }
     }
 
@@ -213,6 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Lógica da Busca ---
     let searchTimeout; 
     searchInput.addEventListener('input', (e) => {
+        // ... (Esta função não muda) ...
         const searchTerm = e.target.value.trim();
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
@@ -226,6 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Lógica de Clique na Categoria ---
     if(categoryTreeContainer) { 
         categoryTreeContainer.addEventListener('click', (e) => {
+            // ... (Esta função não muda) ...
             const link = e.target.closest('a');
             if (link) {
                 e.preventDefault();
@@ -236,7 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-     // --- Lógica de Clique nos Links Internos (#artigo-ID) ---
+     // --- Lógica de Clique nos Links (Índice ou Internos) ---
      contentArea.addEventListener('click', (e) => {
          const internalLink = e.target.closest('a.internal-link');
          if (internalLink && internalLink.getAttribute('href')?.startsWith('#artigo-')) {
@@ -254,10 +313,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Carregamento Inicial ---
     async function initializePage() {
+         // ... (Esta função não muda) ...
          if(categoryTreeContainer) categoryTreeContainer.innerHTML = 'Carregando categorias...';
 
          try {
-             // 1. Busca a lista plana de categorias
              const flatCatResponse = await fetch('/api/categories'); 
              if (!flatCatResponse.ok) throw new Error(`Erro categorias (${flatCatResponse.status})`);
              const flatCategories = await flatCatResponse.json();
@@ -268,11 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  categoryTreeContainer.innerHTML = ''; 
                  categoryTreeContainer.appendChild(treeUl);
              }
-
-             // 2. Busca e exibe todos os artigos inicialmente
-             // (Não precisamos mais buscar o mapa de títulos!)
              await fetchAndDisplayArticles('all');
-
          } catch (error) {
               console.error("Erro inicialização:", error);
               if(categoryTreeContainer) categoryTreeContainer.innerHTML = `<span style="color: red;">${error.message}</span>`;

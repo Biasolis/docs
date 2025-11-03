@@ -86,3 +86,66 @@ body.dark-mode .content mark { background-color: #a88a2c; color: #eee; }
 body.dark-mode a.internal-link { background-color: #004c99; color: #e0e0e0; border-bottom: 1px dashed #3498db; }
 body.dark-mode a.internal-link:hover { background-color: #007bff; color: white; }
 body.dark-mode span.internal-link-broken { background-color: #6a1b1a; color: #ffcdd2; }
+
+/* --- Estilos do Índice de Artigos --- */
+.content-index-title {
+    font-size: 2rem;
+    color: #0056b3;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 10px;
+}
+
+.article-index-list {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 20px;
+}
+
+.article-index-list li {
+    margin-bottom: 10px;
+}
+
+/* Reutiliza o estilo de 'internal-link' que já temos */
+.article-index-list a.internal-link {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.article-index-list a.internal-link:hover {
+    text-decoration: underline;
+}
+
+.article-index-list .search-snippet {
+    font-size: 0.95rem;
+    font-weight: normal;
+    color: #555;
+    margin-top: 4px;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.content hr {
+    border: 0;
+    border-top: 1px solid #eee;
+    margin-bottom: 20px;
+}
+
+/* --- Dark Mode para o Índice --- */
+body.dark-mode .content-index-title {
+    color: #ccc;
+    border-bottom-color: #333;
+}
+
+body.dark-mode .article-index-list a.internal-link {
+    color: #e0e0e0;
+}
+
+body.dark-mode .article-index-list .search-snippet {
+    color: #aaa;
+}
+
+body.dark-mode .content hr {
+    border-top-color: #333;
+}

@@ -1,7 +1,7 @@
-# /Dockerfile (NOVO ARQUIVO)
+# /Dockerfile (CORRIGIDO COM PERMISSÕES)
 
 # --- Estágio 1: Build (Instalação de dependências) ---
-# Usamos a versão 22 do Node (conforme discutimos)
+# Usamos a versão 22 do Node
 FROM node:22-alpine AS builder
 
 WORKDIR /app
@@ -24,6 +24,15 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copia o código da aplicação (backend e frontend)
 COPY ./backend ./backend
 COPY ./public ./public
+
+# --- INÍCIO DA CORREÇÃO ---
+# 1. Garante que o diretório de upload existe (como root)
+RUN mkdir -p /app/public/images
+
+# 2. Muda o dono do diretório 'images' para o usuário 'node'
+#    Isso dá permissão para o sharp salvar os arquivos
+RUN chown -R node:node /app/public/images
+# --- FIM DA CORREÇÃO ---
 
 # Define o usuário padrão como 'node' (mais seguro que 'root')
 USER node
