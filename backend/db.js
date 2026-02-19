@@ -3,10 +3,10 @@ const { Pool } = require('pg');
 
 // Lê as configurações das variáveis de ambiente
 const pool = new Pool({
-    user: process.env.DB_USER || 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    database: process.env.DB_NAME || 'seu_banco_de_dados',
-    password: process.env.DB_PASSWORD || 'sua_senha_do_banco',
+    user: process.env.DB_USER || 'docs_user',
+    host: process.env.DB_HOST || '172.16.13.34',
+    database: process.env.DB_NAME || 'docs_db_hol',
+    password: process.env.DB_PASSWORD || 'jJsxVBEZJu8n3wnSX92r',
     port: process.env.DB_PORT || 5432,
 });
 
