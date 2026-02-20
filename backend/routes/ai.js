@@ -1,8 +1,9 @@
-// /backend/routes/ai.js (NOVO FICHEIRO)
+// /backend/routes/ai.js (COMPLETO, CORRIGIDO E COM SUPORTE A HTML)
 const express = require('express');
 const db = require('../db');
 const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { parseMarkdown } = require('../markdown-parser'); // <-- IMPORTAÇÃO DO PARSER AQUI
 
 const router = express.Router();
 
@@ -10,7 +11,6 @@ const router = express.Router();
 // 1. ROTAS DE ADMINISTRAÇÃO (Configurar IA do Setor)
 // ------------------------------------------------------------------
 
-// Obter configurações atuais de IA do setor logado
 router.get('/settings', verifyToken, isAdmin, async (req, res) => {
     try {
         const result = await db.query(
@@ -20,7 +20,6 @@ router.get('/settings', verifyToken, isAdmin, async (req, res) => {
         if (result.rowCount === 0) return res.status(404).json({ message: 'Setor não encontrado.' });
         
         const data = result.rows[0];
-        // Oculta parte da API Key por segurança ao enviar para o front
         const maskedKey = data.gemini_api_key ? `••••••••••••••••${data.gemini_api_key.slice(-4)}` : '';
         
         res.json({
@@ -34,13 +33,11 @@ router.get('/settings', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
-// Guardar/Atualizar API Key e Status
 router.post('/settings', verifyToken, isAdmin, async (req, res) => {
     const { ai_active, gemini_api_key } = req.body;
     try {
         let query, params;
         
-        // Se enviou uma nova key (não mascarada), atualiza. Se não, atualiza só o status.
         if (gemini_api_key && !gemini_api_key.includes('••••')) {
             query = 'UPDATE sectors SET ai_active = $1, gemini_api_key = $2 WHERE id = $3 RETURNING ai_active, ai_last_sync';
             params = [ai_active, gemini_api_key, req.user.sector_id];
@@ -56,7 +53,6 @@ router.post('/settings', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
-// O famoso botão "Treinar": Calcula o Delta e atualiza o conhecimento
 router.post('/train', verifyToken, isAdmin, async (req, res) => {
     try {
         const sectorRes = await db.query('SELECT ai_last_sync, gemini_api_key FROM sectors WHERE id = $1', [req.user.sector_id]);
@@ -68,13 +64,11 @@ router.post('/train', verifyToken, isAdmin, async (req, res) => {
 
         const lastSync = sector.ai_last_sync || new Date(0);
 
-        // 1. Procura artigos novos ou atualizados para público desde o último treino
         const updatedRes = await db.query(`
             SELECT count(*) FROM articles 
             WHERE sector_id = $1 AND status = 'published_public' AND updated_at > $2
         `, [req.user.sector_id, lastSync]);
 
-        // 2. Procura artigos que foram apagados ou tornados privados desde o último treino
         const removedRes = await db.query(`
             SELECT count(*) FROM articles 
             WHERE sector_id = $1 AND status != 'published_public' AND updated_at > $2
@@ -83,12 +77,11 @@ router.post('/train', verifyToken, isAdmin, async (req, res) => {
         const totalUpdated = parseInt(updatedRes.rows[0].count);
         const totalRemoved = parseInt(removedRes.rows[0].count);
 
-        // Testar a API Key fazendo um pequeno ping ao Gemini
+        // Teste de conexão ajustado para a string oficial do Gemini 2.5 Flash Lite
         const genAI = new GoogleGenerativeAI(sector.gemini_api_key);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
         await model.generateContent("Ping. Responda apenas OK.");
 
-        // Atualiza a data do último treino
         await db.query('UPDATE sectors SET ai_last_sync = CURRENT_TIMESTAMP WHERE id = $1', [req.user.sector_id]);
 
         res.json({ 
@@ -98,7 +91,7 @@ router.post('/train', verifyToken, isAdmin, async (req, res) => {
 
     } catch (err) {
         console.error("Erro no Treinamento da IA:", err);
-        res.status(500).json({ message: 'Falha ao treinar. Verifique se a sua API Key do Gemini é válida.', error: err.message });
+        res.status(500).json({ message: 'Falha ao treinar. Verifique se a sua API Key do Gemini é válida e tem permissão para este modelo.', error: err.message });
     }
 });
 
@@ -113,7 +106,6 @@ router.post('/chat', async (req, res) => {
     if (!message || !sectorSlug) return res.status(400).json({ message: 'Mensagem ou Setor inválido.' });
 
     try {
-        // 1. Busca as configurações de IA do Setor
         const sectorRes = await db.query('SELECT id, name, ai_active, gemini_api_key FROM sectors WHERE slug = $1', [sectorSlug]);
         if (sectorRes.rowCount === 0) return res.status(404).json({ message: 'Setor não encontrado.' });
         
@@ -122,8 +114,6 @@ router.post('/chat', async (req, res) => {
             return res.status(403).json({ message: 'O assistente de IA não está ativo para este setor.' });
         }
 
-        // 2. Recuperação de Conhecimento (RAG via Full Text Search)
-        // Busca os 3 artigos mais relevantes para a pergunta do utilizador
         const searchRes = await db.query(`
             WITH search_query AS ( SELECT plainto_tsquery('portuguese', $1) AS query )
             SELECT title, content_markdown
@@ -138,7 +128,6 @@ router.post('/chat', async (req, res) => {
             contextText = searchRes.rows.map(a => `TÍTULO DO ARTIGO: ${a.title}\nCONTEÚDO:\n${a.content_markdown}`).join('\n\n---\n\n');
         }
 
-        // 3. Montar a instrução de sistema (Persona do Bot)
         const systemInstruction = `
             Você é um assistente virtual especializado de suporte técnico e documentação do setor de ${sector.name} do Consórcio Magalu.
             A sua missão é responder às dúvidas dos utilizadores baseando-se ESTRITAMENTE no contexto fornecido abaixo.
@@ -149,27 +138,49 @@ router.post('/chat', async (req, res) => {
             ${contextText}
         `;
 
-        // 4. Chamar o Gemini
         const genAI = new GoogleGenerativeAI(sector.gemini_api_key);
+        // Atualizado para a string oficial do Gemini 2.5 Flash Lite
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-flash-lite",
             systemInstruction: systemInstruction
         });
 
-        // Formata o histórico do frontend para o formato do Gemini
-        const formattedHistory = history.map(msg => ({
-            role: msg.role === 'ai' ? 'model' : 'user',
-            parts: [{ text: msg.text }]
-        }));
+        // Lógica de Histórico Blindada (Garante que começa com 'user')
+        let validHistory = [];
+        let nextExpectedRole = 'user';
 
-        const chat = model.startChat({ history: formattedHistory });
+        for (const msg of history) {
+            const mappedRole = (msg.role === 'ai' || msg.role === 'model') ? 'model' : 'user';
+            const text = msg.text ? msg.text.trim() : "";
+            
+            if (!text) continue;
+
+            if (mappedRole === nextExpectedRole) {
+                validHistory.push({ role: mappedRole, parts: [{ text: text }] });
+                nextExpectedRole = (nextExpectedRole === 'user') ? 'model' : 'user';
+            }
+        }
+
+        if (validHistory.length > 0 && validHistory[validHistory.length - 1].role === 'user') {
+            validHistory.pop();
+        }
+
+        const chat = model.startChat({ history: validHistory });
         const aiResponse = await chat.sendMessage(message);
+        
+        // Pega o texto gerado pela IA
+        const rawText = aiResponse.response.text();
+        
+        // --- A MÁGICA DA ESTILIZAÇÃO ACONTECE AQUI ---
+        // Converte o Markdown da IA para HTML limpo
+        const htmlText = await parseMarkdown(rawText);
 
-        res.json({ answer: aiResponse.response.text() });
+        // Retorna a resposta em dois formatos: "answer" para manter o histórico coeso, e "html" para exibir na tela!
+        res.json({ answer: rawText, html: htmlText });
 
     } catch (err) {
         console.error("Erro no Chat IA:", err);
-        res.status(500).json({ message: 'Desculpe, estou com dificuldades em ligar aos servidores da IA neste momento.' });
+        res.status(500).json({ message: 'Desculpe, ocorreu um erro ao processar sua dúvida com o Gemini. O modelo pode não estar disponível.' });
     }
 });
 

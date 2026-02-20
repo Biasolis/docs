@@ -6,13 +6,12 @@ import api from '../services/api';
 export default function Chatbot({ sectorSlug, sectorName }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: 'ai', text: `Olá! 👋 Sou o assistente de IA do setor de ${sectorName}. Como posso ajudar você hoje?` }
+    { role: 'ai', text: `Olá! 👋 Sou o assistente de IA do setor de ${sectorName}. Como posso ajudar você hoje?`, html: `<p>Olá! 👋 Sou o assistente de IA do setor de ${sectorName}. Como posso ajudar você hoje?</p>` }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Auto-scroll para a última mensagem
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -35,12 +34,18 @@ export default function Chatbot({ sectorSlug, sectorName }) {
       const res = await api.post('/ai/chat', {
         sectorSlug,
         message: userText,
-        history: messages.slice(-5) // Envia as últimas 5 mensagens para contexto
+        history: messages 
       });
 
-      setMessages(prev => [...prev, { role: 'ai', text: res.data.answer }]);
+      // Salva o texto bruto (para o histórico) e o html (para renderizar)
+      setMessages(prev => [...prev, { role: 'ai', text: res.data.answer, html: res.data.html }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'ai', text: 'Desculpe, ocorreu um erro na conexão. Tente novamente.' }]);
+      console.error(error);
+      setMessages(prev => [...prev, { 
+        role: 'ai', 
+        text: 'Erro de conexão.',
+        html: '<p>Desculpe, ocorreu um erro na conexão. Tente novamente.</p>' 
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -50,7 +55,6 @@ export default function Chatbot({ sectorSlug, sectorName }) {
     <div className="chatbot-wrapper">
       {isOpen ? (
         <div className="chatbot-window">
-          {/* Header estilo LastPass */}
           <div className="chatbot-header">
             <div className="chatbot-header-info">
               <div className="avatar-circle">
@@ -73,13 +77,18 @@ export default function Chatbot({ sectorSlug, sectorName }) {
             {messages.map((msg, index) => (
               <div key={index} className={`chat-bubble-container ${msg.role}`}>
                 {msg.role === 'ai' && (
-                  <div className="chat-avatar">
-                    <Bot size={16} />
-                  </div>
+                  <div className="chat-avatar"><Bot size={16} /></div>
                 )}
+                
+                {/* A MÁGICA VISUAL ACONTECE AQUI */}
                 <div className={`chat-message ${msg.role}`}>
-                  {msg.text}
+                  {msg.html ? (
+                    <span dangerouslySetInnerHTML={{ __html: msg.html }} />
+                  ) : (
+                    <span>{msg.text}</span>
+                  )}
                 </div>
+                
               </div>
             ))}
             
@@ -99,17 +108,15 @@ export default function Chatbot({ sectorSlug, sectorName }) {
               value={input} 
               onChange={(e) => setInput(e.target.value)} 
               disabled={isLoading}
+              autoFocus
             />
             <button type="submit" className="chatbot-send-btn" disabled={!input.trim() || isLoading}>
               <Send size={18} />
             </button>
           </form>
-          <div className="chatbot-footer-brand">
-             Central de Documentação © 2026
-          </div>
+          <div className="chatbot-footer-brand">Portal de Documentação © 2026</div>
         </div>
       ) : (
-        /* Botão Flutuante Estilo Image_8c0e07 */
         <button className="chatbot-toggle-btn" onClick={() => setIsOpen(true)}>
           <MessageSquare size={28} color="white" />
         </button>

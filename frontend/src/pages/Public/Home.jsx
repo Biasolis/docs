@@ -1,4 +1,4 @@
-// frontend/src/pages/Public/Home.jsx
+// frontend/src/pages/Public/Home.jsx (COMPLETO E CORRIGIDO)
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Search, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, Library, LayoutGrid } from 'lucide-react';
@@ -41,45 +41,45 @@ export default function Home() {
   const [articleLoading, setArticleLoading] = useState(false);
   const contentRef = useRef(null);
 
-  // Efeito principal para carregar os dados sempre que o setor mudar
   useEffect(() => {
     const fetchInitialData = async () => {
+      // RESET TOTAL PARA CADA MUDANÇA DE SETOR
       setLoading(true);
       setError('');
-      setCategories([]); // Limpa categorias antigas para evitar "flash" de outro setor
+      setCategories([]); 
       setArticles([]);
       setActiveArticle(null);
 
       try {
-        // 1. Busca setores para validar e pegar config de IA
         const sectorsRes = await api.get('/sectors');
         const foundSector = sectorsRes.data.find(s => s.slug === sectorSlug);
         
         if(foundSector) {
             setSectorInfo(foundSector);
-            setAiSettings({ active: foundSector.ai_active });
+            // Captura status da IA vindo do backend
+            setAiSettings({ active: foundSector.ai_active || false });
 
-            // 2. Busca Categorias FILTRADAS pelo setor (passando o slug na query)
-            const categoriesData = await api.get(`/categories?sector=${sectorSlug}`);
-            setCategories(categoriesData.data);
-
-            // 3. Busca Artigos FILTRADOS pelo setor
-            const articlesRes = await api.get(`/articles/public?sector=${sectorSlug}`);
-            setArticles(articlesRes.data);
+            // Busca paralela de categorias e artigos específicos do setor
+            const [catData, artData] = await Promise.all([
+                api.get(`/categories?sector=${sectorSlug}`),
+                api.get(`/articles/public?sector=${sectorSlug}`)
+            ]);
+            
+            setCategories(catData.data);
+            setArticles(artData.data);
         } else {
             setError('Setor não encontrado.');
         }
       } catch (err) { 
-        setError('Erro ao carregar a página.'); 
+        setError('Erro ao carregar os dados.'); 
       } finally { 
         setLoading(false); 
       }
     };
 
     fetchInitialData();
-  }, [sectorSlug]); // Roda sempre que o parâmetro da URL mudar
+  }, [sectorSlug]);
 
-  // Restante das funções de busca (mantidas iguais, mas garantindo o sectorSlug)
   const fetchArticles = async (type = 'all', value = '') => {
     setLoading(true); setActiveArticle(null);
     try {
@@ -88,7 +88,7 @@ export default function Home() {
       else if (type === 'category') url = `/articles/category/${value}?sector=${sectorSlug}`;
       const res = await api.get(url);
       setArticles(res.data);
-    } catch (err) { setError('Erro ao carregar artigos.'); } 
+    } catch (err) { setError('Erro ao procurar artigos.'); } 
     finally { setLoading(false); }
   };
 
@@ -153,20 +153,19 @@ export default function Home() {
       </section>
 
       <div className="container">
-        {/* Sidebar só aparece se houver categorias */}
         {categories.length > 0 && (
             <aside className="sidebar">
-            <h3>Tópicos</h3>
-            <nav>
-                <ul className="category-tree-public">
-                <li>
-                    <a href="#all" className={`category-item level-0 ${activeCategoryId === null && !searchTerm ? 'active-category' : ''}`} onClick={(e) => { e.preventDefault(); handleSelectCategory(null); }} style={{ paddingLeft: '0.5rem', marginBottom: '1rem' }}>
-                    <span className="category-icon"><Library size={18} /></span><span style={{ flex: 1 }}>Todos os Artigos</span>
-                    </a>
-                </li>
-                {rootCategories.map(cat => <CategoryTreeNode key={cat.id} category={cat} level={0} activeCategoryId={activeCategoryId} onSelectCategory={handleSelectCategory} categories={categories}/>)}
-                </ul>
-            </nav>
+                <h3>Tópicos</h3>
+                <nav>
+                    <ul className="category-tree-public">
+                    <li>
+                        <a href="#all" className={`category-item level-0 ${activeCategoryId === null && !searchTerm ? 'active-category' : ''}`} onClick={(e) => { e.preventDefault(); handleSelectCategory(null); }} style={{ paddingLeft: '0.5rem', marginBottom: '1rem' }}>
+                        <span className="category-icon"><Library size={18} /></span><span style={{ flex: 1 }}>Todos os Artigos</span>
+                        </a>
+                    </li>
+                    {rootCategories.map(cat => <CategoryTreeNode key={cat.id} category={cat} level={0} activeCategoryId={activeCategoryId} onSelectCategory={handleSelectCategory} categories={categories}/>)}
+                    </ul>
+                </nav>
             </aside>
         )}
 
@@ -176,15 +175,11 @@ export default function Home() {
 
           {!loading && activeArticle && (
             <section className="doc-section active">
-              <button onClick={() => setActiveArticle(null)} className="btn-back-list" style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '25px', fontSize: '1rem', fontWeight: '500', padding: 0 }}>
+              <button onClick={() => setActiveArticle(null)} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '25px', fontSize: '1rem', fontWeight: '500', padding: 0 }}>
                 <ArrowLeft size={18} /> Voltar aos resultados
               </button>
               <h2>{activeArticle.title}</h2>
               <div dangerouslySetInnerHTML={{ __html: activeArticle.content_html }} />
-              <p className="article-author">
-                <img src={`https://ui-avatars.com/api/?name=${activeArticle.author_username}&background=random&color=fff&size=32`} alt="Avatar" style={{ borderRadius: '50%' }} />
-                <span>Escrito por <strong>{activeArticle.author_username}</strong> <br/> Atualizado a {new Date(activeArticle.created_at).toLocaleDateString('pt-PT')}</span>
-              </p>
             </section>
           )}
 
@@ -194,14 +189,13 @@ export default function Home() {
               {articles.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem 0', color: '#6b7280' }}>
                   <FileText size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                  <p>Nenhum documento encontrado neste setor.</p>
+                  <p>Nenhum documento encontrado.</p>
                 </div>
               ) : (
                 <ul className="article-index-list">
                   {articles.map(article => (
                     <li key={article.id}>
                       <a href={`#artigo-${article.id}`} className="internal-link" onClick={(e) => { e.preventDefault(); handleViewArticle(article.id); }}>{article.title}</a>
-                      {article.snippet && <p className="search-snippet" dangerouslySetInnerHTML={{ __html: `...${article.snippet}...` }} />}
                     </li>
                   ))}
                 </ul>
