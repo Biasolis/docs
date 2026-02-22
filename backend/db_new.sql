@@ -60,3 +60,10 @@ BEGIN
         ALTER TABLE sectors ADD COLUMN ai_last_sync TIMESTAMP;
     EXCEPTION WHEN duplicate_column THEN END;
 END $$;
+
+ALTER TABLE sectors ADD COLUMN ai_provider VARCHAR(50) DEFAULT 'gemini';
+
+ALTER TABLE sectors ADD COLUMN ai_status VARCHAR(20) DEFAULT 'ready';
+ALTER TABLE sectors ADD COLUMN knowledge_context TEXT;
+
+ALTER TABLE articles ADD COLUMN slug VARCHAR(255);

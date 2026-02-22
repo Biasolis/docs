@@ -3,10 +3,55 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, X, Bot, MessageSquare } from 'lucide-react';
 import api from '../services/api';
 
+// COMPONENTE MÁGICO REESCRITO: Agora 100% seguro contra travamentos do navegador!
+const TypewriterHTML = ({ html, speed = 15 }) => {
+  const [content, setContent] = useState('');
+
+  useEffect(() => {
+    let i = 0;
+    let isMounted = true;
+
+    const typeChar = () => {
+      if (!isMounted || i >= html.length) return;
+
+      let charCount = 1;
+      
+      // Se for o início de uma tag HTML (ex: <strong>, <br>), avança a tag inteira de uma vez
+      if (html[i] === '<') {
+        const endIndex = html.indexOf('>', i);
+        if (endIndex !== -1) {
+          charCount = (endIndex - i) + 1;
+        }
+      } 
+      // Se for um caractere especial do HTML (ex: &nbsp; ou &#39;)
+      else if (html[i] === '&') {
+        const endIndex = html.indexOf(';', i);
+        if (endIndex !== -1 && (endIndex - i) < 10) { 
+          charCount = (endIndex - i) + 1;
+        }
+      }
+
+      i += charCount;
+      // Atualiza o texto cortando a string até a posição atual (muito mais seguro)
+      setContent(html.substring(0, i));
+
+      // Se pulou uma tag inteira, digita instantaneamente. Se for letra, espera os 15ms.
+      setTimeout(typeChar, charCount > 1 ? 0 : speed);
+    };
+
+    typeChar();
+
+    return () => { isMounted = false; };
+  }, [html, speed]);
+
+  return <span dangerouslySetInnerHTML={{ __html: content }} />;
+};
+
+
 export default function Chatbot({ sectorSlug, sectorName }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: 'ai', text: `Olá! 👋 Sou o assistente de IA do setor de ${sectorName}. Como posso ajudar você hoje?`, html: `<p>Olá! 👋 Sou o assistente de IA do setor de ${sectorName}. Como posso ajudar você hoje?</p>` }
+    { role: 'ai', text: `Olá! 👋 Sou o assistente de IA do setor de ${sectorName}. Como posso ajudar você hoje?`, html: `<p>Olá! 👋 Sou o assistente de IA do setor de ${sectorName}. Como posso ajudar você hoje?</p>`, isNew: false }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +70,12 @@ export default function Chatbot({ sectorSlug, sectorName }) {
     if (!input.trim() || isLoading) return;
 
     const userText = input.trim();
-    const newMessages = [...messages, { role: 'user', text: userText }];
+    
+    // CORREÇÃO CRÍTICA: Tira a propriedade 'isNew' de todas as mensagens antigas, 
+    // para garantir que a IA não comece a digitar o histórico todo novamente.
+    const cleanHistory = messages.map(m => ({ ...m, isNew: false }));
+    
+    const newMessages = [...cleanHistory, { role: 'user', text: userText }];
     setMessages(newMessages);
     setInput('');
     setIsLoading(true);
@@ -34,18 +84,38 @@ export default function Chatbot({ sectorSlug, sectorName }) {
       const res = await api.post('/ai/chat', {
         sectorSlug,
         message: userText,
-        history: messages 
+        history: newMessages 
       });
 
-      // Salva o texto bruto (para o histórico) e o html (para renderizar)
-      setMessages(prev => [...prev, { role: 'ai', text: res.data.answer, html: res.data.html }]);
+      // Adiciona apenas a resposta atual com 'isNew: true' para ativar a "Máquina de Escrever"
+      setMessages(prev => [
+        ...prev.map(m => ({ ...m, isNew: false })), 
+        { role: 'ai', text: res.data.answer, html: res.data.html, isNew: true }
+      ]);
     } catch (error) {
       console.error(error);
-      setMessages(prev => [...prev, { 
-        role: 'ai', 
-        text: 'Erro de conexão.',
-        html: '<p>Desculpe, ocorreu um erro na conexão. Tente novamente.</p>' 
-      }]);
+      
+      if (error.response && error.response.status === 423) {
+          setMessages(prev => [
+            ...prev.map(m => ({ ...m, isNew: false })), 
+            { 
+              role: 'ai', 
+              text: error.response.data.message,
+              html: `<p style="color: #d97706; font-weight: bold;">⏳ ${error.response.data.message}</p>`, 
+              isNew: false 
+            }
+          ]);
+      } else {
+          setMessages(prev => [
+            ...prev.map(m => ({ ...m, isNew: false })), 
+            { 
+              role: 'ai', 
+              text: 'Erro de conexão.',
+              html: '<p>Desculpe, ocorreu um erro na conexão. Tente novamente.</p>', 
+              isNew: false 
+            }
+          ]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -80,10 +150,12 @@ export default function Chatbot({ sectorSlug, sectorName }) {
                   <div className="chat-avatar"><Bot size={16} /></div>
                 )}
                 
-                {/* A MÁGICA VISUAL ACONTECE AQUI */}
                 <div className={`chat-message ${msg.role}`}>
                   {msg.html ? (
-                    <span dangerouslySetInnerHTML={{ __html: msg.html }} />
+                    // Aqui decidimos: se a msg for da IA e acabou de chegar (isNew), digita! Se for velha, mostra instantaneamente.
+                    (msg.role === 'ai' && msg.isNew) 
+                        ? <TypewriterHTML html={msg.html} /> 
+                        : <span dangerouslySetInnerHTML={{ __html: msg.html }} />
                   ) : (
                     <span>{msg.text}</span>
                   )}

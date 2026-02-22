@@ -1,4 +1,4 @@
-// /backend/routes/articles.js (COMPLETO E CORRIGIDO)
+// /backend/routes/articles.js (COM GERAÇÃO DE SLUG)
 const express = require('express');
 const db = require('../db');
 const { verifyToken, isEditor, isSuperAdmin } = require('../middleware/authMiddleware');
@@ -18,11 +18,43 @@ async function convertArticlesToHtml(articles) {
     return articles;
 }
 
-// --- Função Auxiliar ---
 async function getSectorId(slug) {
     if (!slug) return null;
     const res = await db.query('SELECT id FROM sectors WHERE slug = $1', [slug]);
     return res.rowCount > 0 ? res.rows[0].id : null;
+}
+
+// === NOVA FUNÇÃO: GERADOR DE SLUG ÚNICO ===
+async function generateUniqueSlug(title, sector_id, currentArticleId = null) {
+    let baseSlug = title
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove acentos
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, '') // Remove caracteres especiais
+        .replace(/\s+/g, '-'); // Troca espaços por hífens
+
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+    let slugExists = true;
+
+    while (slugExists) {
+        let checkQuery = 'SELECT id FROM articles WHERE slug = $1 AND sector_id = $2';
+        let checkParams = [uniqueSlug, sector_id];
+        
+        if (currentArticleId) {
+            checkQuery += ' AND id != $3';
+            checkParams.push(currentArticleId);
+        }
+
+        const res = await db.query(checkQuery, checkParams);
+        if (res.rowCount === 0) {
+            slugExists = false;
+        } else {
+            uniqueSlug = `${baseSlug}-${counter}`;
+            counter++;
+        }
+    }
+    return uniqueSlug;
 }
 
 // == ROTAS PÚBLICAS ==
@@ -32,8 +64,9 @@ router.get('/public', async (req, res) => {
         const sectorId = await getSectorId(req.query.sector);
         if (!sectorId) return res.json([]);
 
+        // Adicionado a coluna 'slug' no retorno
         const query = `
-            SELECT a.id, a.title, a.content_markdown, a.status, a.created_at, u.username AS author_username
+            SELECT a.id, a.title, a.slug, a.content_markdown, a.status, a.created_at, u.username AS author_username
             FROM articles a JOIN users u ON a.author_id = u.id
             WHERE a.status = 'published_public' AND a.sector_id = $1
             ORDER BY a.title;
@@ -52,7 +85,7 @@ router.get('/search', async (req, res) => {
         if (!sectorId) return res.json([]);
 
         if (!searchTerm || searchTerm.trim() === '') {
-            const query = `SELECT a.id, a.title, a.content_markdown, a.status, a.created_at, u.username AS author_username FROM articles a JOIN users u ON a.author_id = u.id WHERE a.status = 'published_public' AND a.sector_id = $1 ORDER BY a.title;`;
+            const query = `SELECT a.id, a.title, a.slug, a.content_markdown, a.status, a.created_at, u.username AS author_username FROM articles a JOIN users u ON a.author_id = u.id WHERE a.status = 'published_public' AND a.sector_id = $1 ORDER BY a.title;`;
             const result = await db.query(query, [sectorId]);
             const articlesWithHtml = await convertArticlesToHtml(result.rows);
             return res.json(articlesWithHtml.map(row => ({...row, snippet: null })));
@@ -60,7 +93,7 @@ router.get('/search', async (req, res) => {
 
         const query = `
             WITH search_query AS ( SELECT plainto_tsquery('portuguese', $1) AS query )
-            SELECT a.id, a.title, a.status, a.created_at, u.username AS author_username,
+            SELECT a.id, a.title, a.slug, a.status, a.created_at, u.username AS author_username,
                    ts_rank_cd(a.search_vector, sq.query) AS rank,
                    ts_headline('portuguese', a.content_markdown, sq.query, 'MaxWords=35, MinWords=15, HighlightAll=TRUE, StartSel=<mark>, StopSel=</mark>') AS snippet
             FROM articles a JOIN users u ON a.author_id = u.id CROSS JOIN search_query sq
@@ -79,7 +112,7 @@ router.get('/category/:categoryId', async (req, res) => {
         if (!sectorId) return res.json([]);
         
         const query = `
-            SELECT a.id, a.title, a.content_markdown, a.status, a.created_at, u.username AS author_username
+            SELECT a.id, a.title, a.slug, a.content_markdown, a.status, a.created_at, u.username AS author_username
             FROM articles a JOIN users u ON a.author_id = u.id JOIN article_categories ac ON a.id = ac.article_id
             WHERE a.status = 'published_public' AND ac.category_id = $1 AND a.sector_id = $2 ORDER BY a.title;
         `;
@@ -89,10 +122,37 @@ router.get('/category/:categoryId', async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Erro buscar por categoria', error: err.message }); }
 });
 
-router.get('/public/:id', async (req, res) => {
+// === NOVA ROTA: BUSCA O ARTIGO PÚBLICO PELO SLUG DO SETOR E SLUG DO ARTIGO ===
+router.get('/public/:sectorSlug/:articleSlug', async (req, res) => {
+    const { sectorSlug, articleSlug } = req.params; 
+    try {
+        const sectorId = await getSectorId(sectorSlug);
+        if (!sectorId) return res.status(404).json({ message: 'Setor não encontrado.' });
+
+        const query = `
+            SELECT a.title, a.content_markdown, a.updated_at, u.username AS author_username
+            FROM articles a JOIN users u ON a.author_id = u.id
+            WHERE a.slug = $1 AND a.status = 'published_public' AND a.sector_id = $2;
+        `;
+        const result = await db.query(query, [articleSlug, sectorId]);
+        
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Artigo não encontrado ou não é público.' });
+        
+        const article = result.rows[0];
+        article.html_content = await parseMarkdown(article.content_markdown); // Prepara o HTML para a página pública
+        delete article.content_markdown;
+
+        res.json(article);
+    } catch (err) { res.status(500).json({ message: 'Erro servidor', error: err.message }); }
+});
+
+// Mantida a rota antiga por ID por segurança/legado (caso seja usada no front admin)
+router.get('/public/:id', async (req, res, next) => {
+    // Se o ID não for número, repassa para a próxima rota (a do slug acima) - TRUQUE EXPRESS
+    if (!/^\d+$/.test(req.params.id)) return next('route'); 
+    
     const { id } = req.params; 
     try {
-        if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'ID artigo inválido.' });
         const sectorId = await getSectorId(req.query.sector);
         if (!sectorId) return res.status(404).json({ message: 'Setor não encontrado.' });
 
@@ -118,7 +178,7 @@ router.get('/public-titles', async (req, res) => {
     try {
         const sectorId = await getSectorId(req.query.sector);
         if (!sectorId) return res.json([]);
-        const result = await db.query(`SELECT id, title FROM articles WHERE status = 'published_public' AND sector_id = $1 ORDER BY title;`, [sectorId]);
+        const result = await db.query(`SELECT id, title, slug FROM articles WHERE status = 'published_public' AND sector_id = $1 ORDER BY title;`, [sectorId]);
         res.json(result.rows);
     } catch (err) { res.status(500).json({ message: 'Erro buscar títulos', error: err.message }); }
 });
@@ -128,7 +188,7 @@ router.get('/public-titles', async (req, res) => {
 router.get('/global', verifyToken, isSuperAdmin, async (req, res) => {
     try {
         const query = `
-            SELECT a.id, a.title, a.status, a.created_at, u.username AS author_username, s.name AS sector_name, s.slug AS sector_slug
+            SELECT a.id, a.title, a.slug, a.status, a.created_at, u.username AS author_username, s.name AS sector_name, s.slug AS sector_slug
             FROM articles a 
             JOIN users u ON a.author_id = u.id
             JOIN sectors s ON a.sector_id = s.id
@@ -146,13 +206,13 @@ router.get('/', verifyToken, async (req, res) => {
         let query;
         if (req.user.role === 'user') { 
             query = `
-                SELECT a.id, a.title, a.status, a.created_at, a.updated_at, u.username AS author_username
+                SELECT a.id, a.title, a.slug, a.status, a.created_at, a.updated_at, u.username AS author_username
                 FROM articles a JOIN users u ON a.author_id = u.id
                 WHERE a.status IN ('published_internal', 'published_public') AND a.sector_id = $1 ORDER BY a.title;
             `;
         } else { 
             query = `
-                SELECT a.id, a.title, a.status, a.created_at, a.updated_at, u.username AS author_username
+                SELECT a.id, a.title, a.slug, a.status, a.created_at, a.updated_at, u.username AS author_username
                 FROM articles a JOIN users u ON a.author_id = u.id
                 WHERE a.sector_id = $1 ORDER BY a.title;
             `;
@@ -204,8 +264,11 @@ router.post('/', async (req, res) => {
     if (!validStatuses.includes(status)) return res.status(400).json({ message: "Status inválido."});
 
     try {
-        const insertArticleQuery = `INSERT INTO articles (title, content_markdown, author_id, status, sector_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING *;`;
-        const articleParams = [title, content_markdown, author_id, status, sector_id];
+        // GERA O SLUG ANTES DE INSERIR
+        const newSlug = await generateUniqueSlug(title, sector_id);
+
+        const insertArticleQuery = `INSERT INTO articles (title, slug, content_markdown, author_id, status, sector_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING *;`;
+        const articleParams = [title, newSlug, content_markdown, author_id, status, sector_id];
         const articleResult = await db.query(insertArticleQuery, articleParams);
         const newArticle = articleResult.rows[0];
 
@@ -229,13 +292,17 @@ router.put('/:id', async (req, res) => {
     if (!validStatuses.includes(status)) return res.status(400).json({ message: "Status inválido."});
 
     try {
+        // GERA O NOVO SLUG BASEADO NO NOVO TÍTULO
+        const sector_id = req.user.role === 'super_admin' ? (await db.query('SELECT sector_id FROM articles WHERE id = $1', [id])).rows[0].sector_id : req.user.sector_id;
+        const updatedSlug = await generateUniqueSlug(title, sector_id, id);
+
         let updateArticleQuery, queryParams;
         if (req.user.role === 'super_admin') {
-            updateArticleQuery = `UPDATE articles SET title = $1, content_markdown = $2, status = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *;`;
-            queryParams = [title, content_markdown, status, id];
+            updateArticleQuery = `UPDATE articles SET title = $1, slug = $2, content_markdown = $3, status = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *;`;
+            queryParams = [title, updatedSlug, content_markdown, status, id];
         } else {
-            updateArticleQuery = `UPDATE articles SET title = $1, content_markdown = $2, status = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 AND sector_id = $5 RETURNING *;`;
-            queryParams = [title, content_markdown, status, id, req.user.sector_id];
+            updateArticleQuery = `UPDATE articles SET title = $1, slug = $2, content_markdown = $3, status = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 AND sector_id = $6 RETURNING *;`;
+            queryParams = [title, updatedSlug, content_markdown, status, id, req.user.sector_id];
         }
 
         const articleResult = await db.query(updateArticleQuery, queryParams);

@@ -7,6 +7,7 @@ import '@toast-ui/editor/dist/toastui-editor.css';
 import '@toast-ui/editor/dist/theme/toastui-editor-dark.css';
 import api from '../../services/api';
 import useDarkMode from '../../hooks/useDarkMode';
+import ConfirmModal from '../../components/ConfirmModal'; // IMPORT DO MODAL (Ajuste o caminho se necessário)
 
 export default function Editor() {
   const [searchParams] = useSearchParams();
@@ -25,9 +26,11 @@ export default function Editor() {
 
   const [lastSaved, setLastSaved] = useState(null);
   const [hasDraft, setHasDraft] = useState(false);
-  
-  // NOVO: Estado para mensagens de feedback visuais em vez de alerts
   const [formMessage, setFormMessage] = useState({ text: '', type: '' });
+
+  // NOVOS ESTADOS PARA O TREINAMENTO DA IA
+  const [isTrainingModalOpen, setIsTrainingModalOpen] = useState(false);
+  const [isTrainingInProgress, setIsTrainingInProgress] = useState(false);
   
   const storageKey = `editorDraft_${isEditing ? articleId : 'new'}`;
 
@@ -118,10 +121,10 @@ export default function Editor() {
     setSelectedCategories(prev => prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]);
   };
 
+  // FUNÇÃO ATUALIZADA: Dispara o Modal de Treino se o artigo for público
   const handleSave = async () => {
     if (!editorRef.current) return;
     const contentMarkdown = editorRef.current.getInstance().getMarkdown();
-    
     setFormMessage({ text: '', type: '' });
 
     if (!title.trim() || !contentMarkdown.trim()) {
@@ -137,17 +140,40 @@ export default function Editor() {
       
       localStorage.removeItem(storageKey);
       
-      // Mensagem de sucesso antes de redirecionar
-      setFormMessage({ text: 'Artigo guardado com sucesso!', type: 'success' });
-      setTimeout(() => navigate('/admin/dashboard'), 1000);
+      // Se for Público, abre o Modal para treinar a IA. Se não, apenas salva e volta.
+      if (status === 'published_public') {
+          setIsTrainingModalOpen(true);
+      } else {
+          setFormMessage({ text: 'Artigo guardado com sucesso!', type: 'success' });
+          setTimeout(() => navigate('/admin/dashboard'), 1000);
+      }
 
     } catch (error) { 
       console.error(error);
-      setFormMessage({ 
-        text: error.response?.data?.message || 'Falha na comunicação com o servidor.', 
-        type: 'error' 
-      }); 
+      setFormMessage({ text: error.response?.data?.message || 'Falha na comunicação com o servidor.', type: 'error' }); 
     }
+  };
+
+  // NOVA FUNÇÃO: Acionada quando o admin clica em "Treinar Agora" no Modal
+  const handleTrainAI = async () => {
+      setIsTrainingInProgress(true);
+      try {
+          await api.post('/ai/train');
+          setFormMessage({ text: 'Artigo guardado e Inteligência Artificial treinada com sucesso!', type: 'success' });
+          setTimeout(() => navigate('/admin/dashboard'), 1500);
+      } catch (err) {
+          alert('Artigo salvo, mas ocorreu uma falha ao treinar a IA. Você pode treinar manualmente depois.');
+          navigate('/admin/dashboard');
+      } finally {
+          setIsTrainingInProgress(false);
+          setIsTrainingModalOpen(false);
+      }
+  };
+
+  // NOVA FUNÇÃO: Acionada quando o admin clica em "Mais tarde" no Modal
+  const handleSkipTrain = () => {
+      setFormMessage({ text: 'Artigo guardado com sucesso!', type: 'success' });
+      navigate('/admin/dashboard');
   };
 
   const renderCategoryCheckboxes = (cats, parentId = null, level = 0) => {
@@ -206,7 +232,6 @@ export default function Editor() {
             </div>
           </div>
 
-          {/* Feedback Visual Trato no React */}
           {formMessage.text && (
             <div className={`feedback-message ${formMessage.type}`} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: 0 }}>
               {formMessage.type === 'error' && <AlertCircle size={16} />}
@@ -236,6 +261,23 @@ export default function Editor() {
           </div>
         </div>
       </div>
+
+      {/* MODAL DE TREINAMENTO DA IA */}
+      <ConfirmModal 
+        isOpen={isTrainingModalOpen} 
+        onClose={isTrainingInProgress ? () => {} : handleSkipTrain}
+        onConfirm={handleTrainAI}
+        title="Atualizar Motor de Inteligência Artificial?"
+        message={
+          isTrainingInProgress 
+          ? "A IA está a compilar e memorizar a nova base de conhecimento. Por favor aguarde..." 
+          : "Você acabou de guardar um artigo público! Deseja compilar a base de dados agora para que o Chatbot consiga responder dúvidas sobre este conteúdo?"
+        }
+        confirmText={isTrainingInProgress ? "A Treinar (Aguarde)..." : "Sim, Atualizar IA"}
+        cancelText="Mais tarde"
+        isDanger={false}
+      />
+
     </main>
   );
 }

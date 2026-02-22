@@ -11,6 +11,8 @@ import Login from './pages/Admin/Login';
 import Dashboard from './pages/Admin/Dashboard';
 import Editor from './pages/Admin/Editor';
 import Settings from './pages/Admin/Settings'; 
+// 👇 IMPORTAÇÃO ADICIONADA AQUI
+import PublicArticle from './pages/PublicArticle'; 
 
 export default function App() {
   return (
@@ -22,6 +24,9 @@ export default function App() {
           
           {/* --- Central Específica do Setor --- */}
           <Route path="/central/:sectorSlug" element={<Home />} />
+
+          {/* --- Artigo Público (Tela de Leitura) --- */}
+          <Route path="/artigos/:sectorSlug/:articleSlug" element={<PublicArticle />} />
           
           {/* --- Painel Admin --- */}
           <Route path="/admin/login" element={<Login />} />
@@ -34,7 +39,6 @@ export default function App() {
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>
-          
         </Routes>
       </BrowserRouter>
     </AuthProvider>
