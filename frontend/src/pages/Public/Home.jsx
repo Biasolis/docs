@@ -129,7 +129,7 @@ export default function Home() {
       <header>
         <div className="logo-container-public">
           <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
-            <img src="http://localhost:3055/images/logo.old.png" alt="Logo" />
+            <img alt="Logo" className="admin-logo" src="/images/logo.old.png" />
           </Link>
           <div style={{ borderLeft: '1px solid #e5e7eb', marginLeft: '15px', paddingLeft: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Link to="/" style={{ color: '#6b7280' }}><LayoutGrid size={18} /></Link>

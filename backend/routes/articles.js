@@ -1,4 +1,4 @@
-// /backend/routes/articles.js (COM GERAÇÃO DE SLUG)
+// /backend/routes/articles.js
 const express = require('express');
 const db = require('../db');
 const { verifyToken, isEditor, isSuperAdmin } = require('../middleware/authMiddleware');
@@ -122,7 +122,7 @@ router.get('/category/:categoryId', async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Erro buscar por categoria', error: err.message }); }
 });
 
-// === NOVA ROTA: BUSCA O ARTIGO PÚBLICO PELO SLUG DO SETOR E SLUG DO ARTIGO ===
+// === ROTA PÚBLICA (SLUG) ===
 router.get('/public/:sectorSlug/:articleSlug', async (req, res) => {
     const { sectorSlug, articleSlug } = req.params; 
     try {
@@ -148,7 +148,6 @@ router.get('/public/:sectorSlug/:articleSlug', async (req, res) => {
 
 // Mantida a rota antiga por ID por segurança/legado (caso seja usada no front admin)
 router.get('/public/:id', async (req, res, next) => {
-    // Se o ID não for número, repassa para a próxima rota (a do slug acima) - TRUQUE EXPRESS
     if (!/^\d+$/.test(req.params.id)) return next('route'); 
     
     const { id } = req.params; 
@@ -210,6 +209,13 @@ router.get('/', verifyToken, async (req, res) => {
                 FROM articles a JOIN users u ON a.author_id = u.id
                 WHERE a.status IN ('published_internal', 'published_public') AND a.sector_id = $1 ORDER BY a.title;
             `;
+        } else if (req.user.role === 'editor') {
+            // REGRA: Editor não pode ver artigos internos privados na lista
+            query = `
+                SELECT a.id, a.title, a.slug, a.status, a.created_at, a.updated_at, u.username AS author_username
+                FROM articles a JOIN users u ON a.author_id = u.id
+                WHERE a.status != 'published_internal_private' AND a.sector_id = $1 ORDER BY a.title;
+            `;
         } else { 
             query = `
                 SELECT a.id, a.title, a.slug, a.status, a.created_at, a.updated_at, u.username AS author_username
@@ -240,8 +246,12 @@ router.get('/:id', verifyToken, async (req, res) => {
         
         const article = articleResult.rows[0];
 
-        if ((article.status === 'draft' || article.status === 'published_internal_private') && req.user.role === 'user') {
-            return res.status(403).json({ message: 'Acesso negado a este conteúdo restrito.' });
+        // REGRAS DE LEITURA (BLOQUEIO POR ROLE)
+        if (article.status === 'published_internal_private' && req.user.role !== 'super_admin') {
+            return res.status(403).json({ message: 'Acesso negado. Apenas Administradores podem visualizar este conteúdo.' });
+        }
+        if (article.status === 'draft' && req.user.role === 'user') {
+            return res.status(403).json({ message: 'Acesso negado a este rascunho.' });
         }
 
         article.content_html = await parseMarkdown(article.content_markdown);
@@ -263,8 +273,12 @@ router.post('/', async (req, res) => {
 
     if (!validStatuses.includes(status)) return res.status(400).json({ message: "Status inválido."});
 
+    // REGRA: Apenas admin pode criar artigo privado
+    if (status === 'published_internal_private' && req.user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Apenas Administradores podem criar artigos Internos Privados."});
+    }
+
     try {
-        // GERA O SLUG ANTES DE INSERIR
         const newSlug = await generateUniqueSlug(title, sector_id);
 
         const insertArticleQuery = `INSERT INTO articles (title, slug, content_markdown, author_id, status, sector_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING *;`;
@@ -291,8 +305,12 @@ router.put('/:id', async (req, res) => {
 
     if (!validStatuses.includes(status)) return res.status(400).json({ message: "Status inválido."});
 
+    // REGRA: Apenas admin pode alterar artigo para privado
+    if (status === 'published_internal_private' && req.user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Apenas Administradores podem definir artigos como Internos Privados."});
+    }
+
     try {
-        // GERA O NOVO SLUG BASEADO NO NOVO TÍTULO
         const sector_id = req.user.role === 'super_admin' ? (await db.query('SELECT sector_id FROM articles WHERE id = $1', [id])).rows[0].sector_id : req.user.sector_id;
         const updatedSlug = await generateUniqueSlug(title, sector_id, id);
 

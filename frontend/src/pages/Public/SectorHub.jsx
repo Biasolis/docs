@@ -22,7 +22,7 @@ export default function SectorHub() {
     <>
       <header>
         <div className="logo-container-public">
-          <img src="http://localhost:3055/images/logo.old.png" alt="Logo" />
+          <img alt="Logo" className="admin-logo" src="/images/logo.old.png" />
           <h1>Portal de Documentação</h1>
         </div>
         <div className="theme-switch-wrapper">

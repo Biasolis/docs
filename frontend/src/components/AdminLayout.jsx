@@ -21,7 +21,7 @@ export default function AdminLayout() {
       <header className="admin-header">
         <div className="header-container">
           <div className="logo-container">
-            <img src="http://localhost:3055/images/logo.old.png" alt="Logo" className="admin-logo" />
+            <img alt="Logo" className="admin-logo" src="/images/logo.old.png" />
             <h2>Painel de Documentação</h2>
           </div>
           
