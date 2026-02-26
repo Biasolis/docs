@@ -15,14 +15,13 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* --- ESTILOS PADRÃO (LIGHT MODE / GERAL) --- */
 a {
   font-weight: 500;
-  color: #646cff;
+  color: #007bff;
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: #0056b3;
 }
 
 body {
@@ -55,77 +54,4 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
-}
-
-/* =======================================================
-   BLINDAGEM TOTAL PARA O MODO ESCURO (DARK MODE)
-======================================================= */
-@media (prefers-color-scheme: dark) {
-  /* Fundo geral mais agradável e texto base claro */
-  body {
-    background-color: #121212 !important;
-    color: #e5e7eb !important;
-  }
-
-  /* Força TODOS os links e qualquer texto DENTRO dos links a ficarem azuis claros */
-  a, 
-  a * {
-    color: #60a5fa !important; 
-    text-decoration: none;
-  }
-
-  a:hover, 
-  a:hover * {
-    color: #93c5fd !important; /* Fica um pouco mais claro ao passar o rato */
-    text-decoration: underline;
-  }
-
-  /* Força os Títulos a ficarem totalmente brancos/claros */
-  h1, h2, h3, h4, h5, h6, strong, b {
-    color: #ffffff !important;
-  }
-
-  /* Clareia as bordas das listas e cartões que estão muito escuras */
-  .article-card,
-  .public-article-container,
-  div[class*="card"],
-  div[class*="item"],
-  li {
-    background-color: #1f2937 !important;
-    border: 1px solid #374151 !important;
-    color: #f3f4f6 !important;
-  }
-}
-
-/* =======================================================
-   SUPORTE PARA CLASSE MANUAL (.dark)
-======================================================= */
-/* Caso o seu projeto use Tailwind ou um botão de alternar tema que injeta a classe "dark" no HTML */
-.dark body {
-  background-color: #121212 !important;
-  color: #e5e7eb !important;
-}
-
-.dark a, 
-.dark a * {
-  color: #60a5fa !important;
-}
-
-.dark a:hover, 
-.dark a:hover * {
-  color: #93c5fd !important;
-}
-
-.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6, .dark strong, .dark b {
-  color: #ffffff !important;
-}
-
-.dark .article-card,
-.dark .public-article-container,
-.dark div[class*="card"],
-.dark div[class*="item"],
-.dark li {
-  background-color: #1f2937 !important;
-  border-color: #374151 !important;
-  color: #f3f4f6 !important;
 }

@@ -6,6 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const sharp = require('sharp');
 const { parseMarkdown } = require('../markdown-parser');
+const jwt = require('jsonwebtoken'); // ADICIONADO: Necessário para a API Mista
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -22,6 +23,26 @@ async function getSectorId(slug) {
     if (!slug) return null;
     const res = await db.query('SELECT id FROM sectors WHERE slug = $1', [slug]);
     return res.rowCount > 0 ? res.rows[0].id : null;
+}
+
+// === NOVA FUNÇÃO: VERIFICA SE O UTILIZADOR TEM LOGIN (Para ver Rascunhos e Internos na Área Pública) ===
+async function getAllowedStatuses(req) {
+    const authHeader = req.headers['authorization'];
+    if (authHeader) {
+        try {
+            const token = authHeader.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'c8bd8cb5cb70b4cb9fac5b3faf51d896b21a10586882104aa4290e2bdbbaa04c');
+            const userRes = await db.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
+            if (userRes.rowCount > 0) {
+                const role = userRes.rows[0].role;
+                if (role === 'super_admin') return ['published_public', 'published_internal', 'published_internal_private', 'draft'];
+                if (role === 'admin' || role === 'editor') return ['published_public', 'published_internal', 'draft'];
+                return ['published_public', 'published_internal']; // Usuário normal
+            }
+        } catch(e) { /* Ignora se o token for inválido e trata como anónimo */ }
+    }
+    // Se não tiver login, só vê o que é 100% público
+    return ['published_public'];
 }
 
 // === NOVA FUNÇÃO: GERADOR DE SLUG ÚNICO ===
@@ -57,21 +78,22 @@ async function generateUniqueSlug(title, sector_id, currentArticleId = null) {
     return uniqueSlug;
 }
 
-// == ROTAS PÚBLICAS ==
+// == ROTAS PÚBLICAS / MISTAS ==
 
 router.get('/public', async (req, res) => {
     try {
         const sectorId = await getSectorId(req.query.sector);
         if (!sectorId) return res.json([]);
+        
+        const allowedStatuses = await getAllowedStatuses(req); // Aplica a regra
 
-        // Adicionado a coluna 'slug' no retorno
         const query = `
             SELECT a.id, a.title, a.slug, a.content_markdown, a.status, a.created_at, u.username AS author_username
             FROM articles a JOIN users u ON a.author_id = u.id
-            WHERE a.status = 'published_public' AND a.sector_id = $1
+            WHERE a.status = ANY($1) AND a.sector_id = $2
             ORDER BY a.title;
         `;
-        const result = await db.query(query, [sectorId]);
+        const result = await db.query(query, [allowedStatuses, sectorId]);
         const articlesWithHtml = await convertArticlesToHtml(result.rows);
         res.json(articlesWithHtml.map(row => ({...row, snippet: null })));
     } catch (err) { res.status(500).json({ message: 'Erro no servidor', error: err.message }); }
@@ -83,10 +105,12 @@ router.get('/search', async (req, res) => {
     try {
         const sectorId = await getSectorId(sectorSlug);
         if (!sectorId) return res.json([]);
+        
+        const allowedStatuses = await getAllowedStatuses(req); // Aplica a regra
 
         if (!searchTerm || searchTerm.trim() === '') {
-            const query = `SELECT a.id, a.title, a.slug, a.content_markdown, a.status, a.created_at, u.username AS author_username FROM articles a JOIN users u ON a.author_id = u.id WHERE a.status = 'published_public' AND a.sector_id = $1 ORDER BY a.title;`;
-            const result = await db.query(query, [sectorId]);
+            const query = `SELECT a.id, a.title, a.slug, a.content_markdown, a.status, a.created_at, u.username AS author_username FROM articles a JOIN users u ON a.author_id = u.id WHERE a.status = ANY($1) AND a.sector_id = $2 ORDER BY a.title;`;
+            const result = await db.query(query, [allowedStatuses, sectorId]);
             const articlesWithHtml = await convertArticlesToHtml(result.rows);
             return res.json(articlesWithHtml.map(row => ({...row, snippet: null })));
         }
@@ -97,10 +121,10 @@ router.get('/search', async (req, res) => {
                    ts_rank_cd(a.search_vector, sq.query) AS rank,
                    ts_headline('portuguese', a.content_markdown, sq.query, 'MaxWords=35, MinWords=15, HighlightAll=TRUE, StartSel=<mark>, StopSel=</mark>') AS snippet
             FROM articles a JOIN users u ON a.author_id = u.id CROSS JOIN search_query sq
-            WHERE a.status = 'published_public' AND a.sector_id = $2 AND a.search_vector @@ sq.query
+            WHERE a.status = ANY($2) AND a.sector_id = $3 AND a.search_vector @@ sq.query
             ORDER BY rank DESC, a.title;
         `;
-        const result = await db.query(query, [searchTerm, sectorId]);
+        const result = await db.query(query, [searchTerm, allowedStatuses, sectorId]);
         res.json(result.rows);
     } catch (err) { res.status(500).json({ message: 'Erro no servidor', error: err.message }); }
 });
@@ -111,12 +135,14 @@ router.get('/category/:categoryId', async (req, res) => {
         const sectorId = await getSectorId(req.query.sector);
         if (!sectorId) return res.json([]);
         
+        const allowedStatuses = await getAllowedStatuses(req); // Aplica a regra
+        
         const query = `
             SELECT a.id, a.title, a.slug, a.content_markdown, a.status, a.created_at, u.username AS author_username
             FROM articles a JOIN users u ON a.author_id = u.id JOIN article_categories ac ON a.id = ac.article_id
-            WHERE a.status = 'published_public' AND ac.category_id = $1 AND a.sector_id = $2 ORDER BY a.title;
+            WHERE a.status = ANY($1) AND ac.category_id = $2 AND a.sector_id = $3 ORDER BY a.title;
         `;
-        const result = await db.query(query, [categoryId, sectorId]);
+        const result = await db.query(query, [allowedStatuses, categoryId, sectorId]);
         const articlesWithHtml = await convertArticlesToHtml(result.rows);
         res.json(articlesWithHtml.map(row => ({...row, snippet: null })));
     } catch (err) { res.status(500).json({ message: 'Erro buscar por categoria', error: err.message }); }
@@ -129,14 +155,23 @@ router.get('/public/:sectorSlug/:articleSlug', async (req, res) => {
         const sectorId = await getSectorId(sectorSlug);
         if (!sectorId) return res.status(404).json({ message: 'Setor não encontrado.' });
 
+        const allowedStatuses = await getAllowedStatuses(req); // Aplica a regra
+
         const query = `
-            SELECT a.title, a.content_markdown, a.updated_at, u.username AS author_username
+            SELECT a.title, a.content_markdown, a.status, a.updated_at, u.username AS author_username
             FROM articles a JOIN users u ON a.author_id = u.id
-            WHERE a.slug = $1 AND a.status = 'published_public' AND a.sector_id = $2;
+            WHERE a.slug = $1 AND a.status = ANY($2) AND a.sector_id = $3;
         `;
-        const result = await db.query(query, [articleSlug, sectorId]);
+        const result = await db.query(query, [articleSlug, allowedStatuses, sectorId]);
         
-        if (result.rowCount === 0) return res.status(404).json({ message: 'Artigo não encontrado ou não é público.' });
+        if (result.rowCount === 0) {
+            // Verifica se o artigo existe no banco, mas a pessoa não tem permissão para o ver
+            const checkRes = await db.query('SELECT id FROM articles WHERE slug = $1 AND sector_id = $2', [articleSlug, sectorId]);
+            if (checkRes.rowCount > 0) {
+                return res.status(403).json({ message: '🔒 Este documento é restrito. Por favor, inicie sessão no Painel para ter acesso.' });
+            }
+            return res.status(404).json({ message: 'Artigo não encontrado.' });
+        }
         
         const article = result.rows[0];
         article.html_content = await parseMarkdown(article.content_markdown); // Prepara o HTML para a página pública
@@ -155,13 +190,20 @@ router.get('/public/:id', async (req, res, next) => {
         const sectorId = await getSectorId(req.query.sector);
         if (!sectorId) return res.status(404).json({ message: 'Setor não encontrado.' });
 
+        const allowedStatuses = await getAllowedStatuses(req); // Aplica a regra
+
         const query = `
             SELECT a.*, u.username AS author_username
             FROM articles a JOIN users u ON a.author_id = u.id
-            WHERE a.id = $1 AND a.status = 'published_public' AND a.sector_id = $2;
+            WHERE a.id = $1 AND a.status = ANY($2) AND a.sector_id = $3;
         `;
-        const result = await db.query(query, [id, sectorId]);
-        if (result.rowCount === 0) return res.status(404).json({ message: 'Artigo não encontrado ou não é público.' });
+        const result = await db.query(query, [id, allowedStatuses, sectorId]);
+        
+        if (result.rowCount === 0) {
+            const checkRes = await db.query('SELECT id FROM articles WHERE id = $1 AND sector_id = $2', [id, sectorId]);
+            if (checkRes.rowCount > 0) return res.status(403).json({ message: '🔒 Este documento é restrito. Por favor, inicie sessão no Painel para ter acesso.' });
+            return res.status(404).json({ message: 'Artigo não encontrado.' });
+        }
         
         const article = result.rows[0];
         article.content_html = await parseMarkdown(article.content_markdown);
@@ -177,7 +219,10 @@ router.get('/public-titles', async (req, res) => {
     try {
         const sectorId = await getSectorId(req.query.sector);
         if (!sectorId) return res.json([]);
-        const result = await db.query(`SELECT id, title, slug FROM articles WHERE status = 'published_public' AND sector_id = $1 ORDER BY title;`, [sectorId]);
+        
+        const allowedStatuses = await getAllowedStatuses(req); // Aplica a regra
+
+        const result = await db.query(`SELECT id, title, slug FROM articles WHERE status = ANY($1) AND sector_id = $2 ORDER BY title;`, [allowedStatuses, sectorId]);
         res.json(result.rows);
     } catch (err) { res.status(500).json({ message: 'Erro buscar títulos', error: err.message }); }
 });
@@ -200,25 +245,27 @@ router.get('/global', verifyToken, isSuperAdmin, async (req, res) => {
     }
 });
 
+// === A CORREÇÃO ESTÁ AQUI NA ROTA '/' ===
 router.get('/', verifyToken, async (req, res) => {
     try {
         let query;
+        // Adicionada a coluna a.sector_id no SELECT das três consultas
         if (req.user.role === 'user') { 
             query = `
-                SELECT a.id, a.title, a.slug, a.status, a.created_at, a.updated_at, u.username AS author_username
+                SELECT a.id, a.title, a.slug, a.status, a.created_at, a.updated_at, u.username AS author_username, a.sector_id
                 FROM articles a JOIN users u ON a.author_id = u.id
                 WHERE a.status IN ('published_internal', 'published_public') AND a.sector_id = $1 ORDER BY a.title;
             `;
         } else if (req.user.role === 'editor') {
             // REGRA: Editor não pode ver artigos internos privados na lista
             query = `
-                SELECT a.id, a.title, a.slug, a.status, a.created_at, a.updated_at, u.username AS author_username
+                SELECT a.id, a.title, a.slug, a.status, a.created_at, a.updated_at, u.username AS author_username, a.sector_id
                 FROM articles a JOIN users u ON a.author_id = u.id
                 WHERE a.status != 'published_internal_private' AND a.sector_id = $1 ORDER BY a.title;
             `;
         } else { 
             query = `
-                SELECT a.id, a.title, a.slug, a.status, a.created_at, a.updated_at, u.username AS author_username
+                SELECT a.id, a.title, a.slug, a.status, a.created_at, a.updated_at, u.username AS author_username, a.sector_id
                 FROM articles a JOIN users u ON a.author_id = u.id
                 WHERE a.sector_id = $1 ORDER BY a.title;
             `;

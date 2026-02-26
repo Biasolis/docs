@@ -13,11 +13,11 @@ export default function PublicArticle() {
   useEffect(() => {
     const fetchArticle = async () => {
       try {
-        // Vamos criar esta rota no backend em seguida!
         const res = await api.get(`/articles/public/${sectorSlug}/${articleSlug}`);
         setArticle(res.data);
       } catch (err) {
-        setError('Artigo não encontrado ou indisponível.');
+        // Captura o erro "Restrito" enviado pelo Backend
+        setError(err.response?.data?.message || 'Artigo não encontrado ou indisponível.');
       } finally {
         setLoading(false);
       }
@@ -31,8 +31,11 @@ export default function PublicArticle() {
   if (error || !article) return (
     <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
       <h2>Ocorreu um erro</h2>
-      <p>{error}</p>
-      <Link to="/" style={{ color: '#007bff', textDecoration: 'underline' }}>Voltar ao Início</Link>
+      <p style={{ fontSize: '1.2rem', color: '#ef4444', margin: '1rem 0' }}>{error}</p>
+      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '2rem' }}>
+        <Link to="/" style={{ color: '#007bff', textDecoration: 'none', padding: '10px 20px', border: '1px solid #007bff', borderRadius: '8px' }}>Voltar ao Início</Link>
+        <Link to="/admin/login" style={{ backgroundColor: '#007bff', color: '#fff', textDecoration: 'none', padding: '10px 20px', borderRadius: '8px' }}>Fazer Login</Link>
+      </div>
     </div>
   );
 
@@ -41,6 +44,13 @@ export default function PublicArticle() {
       <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#6b7280', textDecoration: 'none', marginBottom: '2rem' }}>
         <ArrowLeft size={18} /> Voltar à Central de Ajuda
       </Link>
+
+      {/* Alerta Visual se for um artigo Restrito/Rascunho */}
+      {article.status !== 'published_public' && (
+        <div style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '10px 15px', borderRadius: '8px', marginBottom: '2rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <strong>Aviso:</strong> Está a pré-visualizar um documento restrito (Status: {article.status}).
+        </div>
+      )}
 
       <article className="public-article-container">
         <header style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
@@ -57,7 +67,6 @@ export default function PublicArticle() {
           </div>
         </header>
 
-        {/* Renderiza o Markdown em HTML (você pode precisar importar a sua folha de estilos de Markdown aqui se tiver uma) */}
         <div 
           className="markdown-content" 
           style={{ lineHeight: '1.8', fontSize: '1.1rem', color: '#374151' }}

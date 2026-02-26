@@ -41,7 +41,7 @@ export default function Login() {
     <div className="login-container">
       <div className="login-logo-container">
         {/* Como a pasta do backend está a servir as imagens em desenvolvimento, isto vai funcionar perfeitamente */}
-        <img src="http://localhost:3055/images/logo.old.png" alt="Logo Consórcio Magalu" style={{ height: '45px', width: 'auto' }} />
+        <img alt="Logo" className="admin-logo" src="/images/logo.old.png" style={{ height: '45px', width: 'auto' }} />
       </div>
 
       <h2>Login - Central de Documentação</h2>
